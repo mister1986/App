@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spiker — YouTube & Live Persian Captions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D0F13;
+    --panel:#151821;
+    --panel-2:#1B1F2B;
+    --line:#262B38;
+    --text:#E9EBF1;
+    --muted:#8A91A3;
+    --teal:#4FD8C7;
+    --teal-dim:#1E4842;
+    --amber:#F2B84B;
+    --fa-bg:#181231;
+    --fa-panel:#221A44;
+    --fa-gold:#F4C77A;
+    --danger:#E8637A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ---------- Shell ---------- */
+  .shell{max-width:960px;margin:0 auto;padding:32px 20px 80px;}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--teal),#2E8F82);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand .mark svg{width:20px;height:20px;}
+  .brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:0.2px;}
+  .brand .sub{font-size:12px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace;}
+  .status-pill{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:12px;font-family:'JetBrains Mono',monospace;letter-spacing:0.3px;}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .2s;}
+  .status-pill.live .status-dot{background:var(--teal);box-shadow:0 0 0 4px var(--teal-dim);animation:pulse 1.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+
+  /* ---------- Setup panel ---------- */
+  details.setup{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:20px;overflow:hidden;}
+  details.setup summary{cursor:pointer;padding:16px 18px;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:10px;list-style:none;}
+  details.setup summary::-webkit-details-marker{display:none;}
+  details.setup summary .chev{margin-left:auto;color:var(--muted);transition:transform .2s;font-size:12px;}
+  details.setup[open] summary .chev{transform:rotate(90deg);}
+  details.setup summary .tag{background:var(--teal-dim);color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:3px 8px;border-radius:6px;}
+  .setup-body{padding:0 18px 20px;font-size:13.5px;line-height:1.7;color:#C6CAD6;}
+  .setup-body h4{font-size:12px;text-transform:uppercase;letter-spacing:0.6px;color:var(--amber);margin:16px 0 6px;font-family:'JetBrains Mono',monospace;}
+  .setup-body ol{margin:0;padding-left:20px;}
+  .setup-body a{color:var(--teal);}
+
+  /* ---------- Control card ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:20px;}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;}
+  select{background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:10px 12px;border-radius:10px;font-size:13.5px;min-width:200px;font-family:'Inter',sans-serif;}
+  select:focus,button:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+  button{border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;border-radius:10px;transition:transform .08s, background .15s;}
+  button:active{transform:scale(0.97);}
+  .btn-main{background:var(--teal);color:#06201C;padding:12px 22px;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .btn-main.stop{background:var(--danger);color:#2A0A10;}
+  .btn-ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line);padding:12px 18px;font-size:13.5px;}
+  .btn-ghost:hover{border-color:var(--teal);}
+
+  .viz{height:52px;flex:1;min-width:180px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .pc-audio-note{margin-top:14px;font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;line-height:1.6;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;}
+
+  /* ---------- Transcript panels ---------- */
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:720px){.panels{grid-template-columns:1fr;}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;height:420px;}
+  .panel-en .fa-title{color:var(--muted);}
+  .panel-fa{background:var(--fa-panel);border-color:#33285F;}
+  .panel h3{margin:0 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);font-family:'JetBrains Mono',monospace;display:flex;justify-content:space-between;}
+  .panel-fa h3{color:#B79FE8;}
+  .feed{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+  .feed::-webkit-scrollbar{width:6px;}
+  .feed::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+  .line{font-size:14.5px;line-height:1.55;padding-bottom:10px;border-bottom:1px dashed var(--line);color:#D6D9E2;}
+  .line:last-child{border-bottom:none;}
+  .line.interim{color:var(--muted);font-style:italic;}
+  .fa-line{font-family:'Vazirmatn',sans-serif;direction:rtl;text-align:right;font-size:22px;font-weight:600;color:var(--fa-gold);line-height:1.85;padding:12px 14px;border:1px solid transparent;border-bottom-color:#33285F;border-radius:10px;transition:opacity .25s,transform .25s,background .25s,border-color .25s;}
+  .fa-line:last-child{border-color:rgba(244,199,122,.42);background:rgba(244,199,122,.08);transform:scale(1.01);}
+  .fa-line:not(:last-child){opacity:.66;}
+  .fa-line.pending{color:#8A78C4;font-weight:400;animation:pendingPulse 1s ease-in-out infinite;}
+  @keyframes pendingPulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+  .fa-line.failed{color:var(--danger);font-weight:400;}
+  .empty-hint{color:var(--muted);font-size:13px;font-style:italic;}
+
+  .footer-row{display:flex;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap;gap:10px;}
+  .err-banner{background:#3A1620;border:1px solid var(--danger);color:#FFC7D1;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:16px;display:none;}
+  .readiness{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px;}
+  .ready-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);font-size:12px;color:var(--muted);}
+  .ready-item strong{color:var(--text);font-weight:600}.ready-icon{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 3px rgba(244,199,122,.1)}
+  .ready-item.ok .ready-icon{background:var(--teal);box-shadow:0 0 0 3px rgba(79,216,199,.1)}
+  .ready-item.bad .ready-icon{background:var(--danger)}
+  @media(max-width:760px){.readiness{grid-template-columns:1fr}}
+
+  /* ---------- Translation-only window ---------- */
+  body.fa-window{
+    background:transparent;
+    overflow:hidden;
+  }
+  .fa-shell{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+    padding:18px;
+    background:transparent;
+  }
+  .fa-shell header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    padding:7px 11px;
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:999px;
+    background:rgba(10,12,18,.12);
+    backdrop-filter:blur(12px) saturate(130%);
+    -webkit-backdrop-filter:blur(12px) saturate(130%);
+    box-shadow:0 6px 20px rgba(0,0,0,.14);
+  }
+  .fa-shell header .lbl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.8px;
+    color:rgba(255,255,255,.78);
+    text-transform:uppercase;
+  }
+  .fa-feed{
+    flex:0 1 auto;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+    gap:10px;
+    overflow:hidden;
+    scroll-behavior:smooth;
+  }
+  .fa-feed .fa-line{
+    direction:rtl;
+    text-align:center;
+    font-family:'Vazirmatn',sans-serif;
+    font-size:clamp(17px,3.2vw,30px);
+    line-height:1.65;
+    font-weight:800;
+    color:#fff;
+    width:100%;
+    margin:0 auto;
+    padding:8px 14px;
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:14px;
+    background:linear-gradient(135deg,rgba(10,12,18,.24),rgba(24,18,49,.18));
+    backdrop-filter:blur(14px) saturate(135%);
+    -webkit-backdrop-filter:blur(14px) saturate(135%);
+    box-shadow:0 8px 24px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.04);
+    text-shadow:0 1px 5px rgba(0,0,0,.95),0 0 1px #000;
+    opacity:0;
+    animation:rise .3s ease forwards;
+  }
+  .fa-feed .fa-line:not(:last-child){opacity:.24;font-size:clamp(15px,2.2vw,22px);}
+  .fa-feed .fa-line:last-child{opacity:1;border-color:rgba(255,255,255,.20);}
+  @keyframes rise{from{opacity:0;transform:translateY(8px) scale(.985);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .fa-feed::-webkit-scrollbar{display:none;}
+
+
+  /* ---------- Media source system ---------- */
+  .source-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:20px;}
+  .source-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .source-head h2{font-size:14px;margin:0;}
+  .source-grid{display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:end;}
+  .source-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end;}
+  .source-controls input[type="url"],.source-controls input[type="text"]{flex:1;min-width:240px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:11px 12px;border-radius:10px;font:13.5px 'Inter',sans-serif;}
+  .source-controls input:focus{outline:2px solid var(--teal);outline-offset:2px;}
+  .source-pane{display:none;margin-top:16px;}
+  .source-pane.active{display:block;}
+  .video-stage{position:relative;aspect-ratio:16/9;overflow:hidden;background:#000;border-radius:16px;border:1px solid var(--line);}
+  .video-stage iframe,.video-stage video{width:100%;height:100%;border:0;display:block;background:#000;}
+  .video-empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted);font-size:13px;}
+  .caption-overlay{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);width:min(88%,900px);padding:7px 12px;border-radius:14px;background:rgba(10,12,18,var(--caption-alpha,.14));border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(var(--caption-blur,10px)) saturate(130%);-webkit-backdrop-filter:blur(var(--caption-blur,10px)) saturate(130%);pointer-events:none;text-align:center;direction:rtl;z-index:5;transition:bottom .2s,top .2s,background .2s;}
+  .caption-overlay.pos-top{top:28px;bottom:auto;}.caption-overlay.pos-center{top:50%;bottom:auto;transform:translate(-50%,-50%);}
+  .caption-history{display:none!important;}
+  .caption-current{font-family:'Vazirmatn',sans-serif;font-size:var(--caption-size,24px);font-weight:800;line-height:1.45;color:#fff;text-shadow:0 1px 5px #000,0 0 1px #000;display:block;width:100%;overflow:hidden;}
+  .caption-current.lines-1{white-space:nowrap;text-overflow:ellipsis;}
+  .caption-current.lines-2,.caption-current.lines-3{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;}
+  .caption-current.lines-2{-webkit-line-clamp:2;line-clamp:2;}
+  .caption-current.lines-3{-webkit-line-clamp:3;line-clamp:3;}
+  .caption-current.lines-full{white-space:normal;overflow:visible;display:block;}
+  .caption-overlay.align-right{text-align:right;}
+  .appearance{margin-top:14px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:0 14px;}
+  .appearance summary{cursor:pointer;padding:12px 0;font-size:12px;font-weight:600;}
+  .appearance-grid{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:12px;padding:0 0 14px;}
+  .appearance-grid label{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:6px;}
+  .appearance-grid input[type="range"]{width:100%;}
+  .source-note{font-size:12px;line-height:1.55;color:var(--muted);margin-top:10px;}
+  .local-file{display:none;}
+  @media(max-width:760px){.source-grid{grid-template-columns:1fr}.appearance-grid{grid-template-columns:1fr 1fr}.caption-overlay{bottom:3px;width:97%;}.caption-current{font-size:calc(var(--caption-size,24px)*.86)}}
+
+</style>
+</head>
+<body>
+
+<!-- ============ MAIN CONTROL WINDOW ============ -->
+<div id="mainView" class="shell">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 10v4h3l4 4V6L7 10H4z" fill="#06201C"/><path d="M15 9a3 3 0 0 1 0 6M17.5 6.5a7 7 0 0 1 0 11" stroke="#06201C" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>Spiker</h1>
+        <div class="sub">Private browser Whisper → reader-paced Persian captions <span class="tag mono" style="margin-left:6px">V8.1</span></div>
+      </div>
+    </div>
+    <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">IDLE</span><span id="segmentCountdown" style="color:var(--amber);margin-left:4px"></span></div>
+  </header>
+
+  <div class="err-banner" id="errBanner"></div>
+  <div class="readiness" aria-label="Browser readiness">
+    <div class="ready-item" id="secureReady"><span class="ready-icon"></span><span><strong>Secure page</strong><br><span id="secureReadyText">checking…</span></span></div>
+    <div class="ready-item" id="captureReady"><span class="ready-icon"></span><span><strong>Tab audio</strong><br><span id="captureReadyText">checking…</span></span></div>
+    <div class="ready-item" id="gpuReady"><span class="ready-icon"></span><span><strong>Processing</strong><br><span id="gpuReadyText">checking…</span></span></div>
+  </div>
+
+  <details class="setup" id="setupPanel" open>
+    <summary>Start in 3 steps — no installation or API key <span class="tag">recommended</span><span class="chev">▸</span></summary>
+    <div class="setup-body">
+      <ol>
+        <li>Play the video or audio in a Chrome or Edge tab.</li>
+        <li>Press <b>Start Listening</b>, choose the tab that is playing, and turn on <b>Share tab audio</b>.</li>
+        <li>Keep the shared tab playing. Spiker transcribes locally with Whisper and displays Persian captions here or in the glass overlay.</li>
+      </ol>
+      <p><b>Privacy:</b> transcription runs in your browser. No speech-to-text key or Python server is used. The first model download can be large, but the browser normally caches it.</p>
+      <p style="color:var(--muted)"><b>Important:</b> browsers must show the sharing chooser; Spiker cannot capture another tab silently. Upload this file to any normal HTTPS website host. No localhost or application server is required.</p>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;color:var(--muted)">Fallback: Chrome speech input / virtual audio cable</summary>
+        <div style="padding-top:10px">Use this only when shared-tab capture is unavailable. Select <b>Chrome speech input / virtual cable</b> under Caption appearance, then route system output through VB-CABLE on Windows or BlackHole on macOS. This fallback may show a microphone-style permission prompt.</div>
+      </details>
+    </div>
+  </details>
+
+
+  <section class="source-card" aria-labelledby="sourceTitle">
+    <div class="source-head">
+      <div><h2 id="sourceTitle">Media Source</h2><div class="sub">watch inside Spiker while the same translation engine runs behind it</div></div>
+      <span class="tag mono" id="sourceBadge">SYSTEM AUDIO</span>
+    </div>
+    <div class="source-grid">
+      <div class="field">
+        <label for="sourceSelect">Choose source</label>
+        <select id="sourceSelect">
+          <option value="system-audio">Browser tab / system audio</option>
+          <option value="youtube">YouTube URL</option>
+          <option value="local-video">Local video file</option>
+          <option value="overlay-only">External glass overlay only</option>
+        </select>
+      </div>
+      <div>
+        <div class="source-controls" id="youtubeControls" style="display:none">
+          <input id="youtubeUrl" type="url" inputmode="url" placeholder="Paste YouTube link…" aria-label="YouTube URL">
+          <button class="btn-main" id="loadYoutubeBtn" type="button">Load video</button>
+          <button class="btn-ghost" id="openYoutubeBtn" type="button">Open on YouTube</button>
+        </div>
+        <div class="source-controls" id="localControls" style="display:none">
+          <label class="btn-main" for="localFileInput" style="cursor:pointer">Choose local video</label>
+          <input class="local-file" id="localFileInput" type="file" accept="video/*,audio/*">
+          <span class="mono" id="localFileName" style="font-size:12px;color:var(--muted)">No file selected</span>
+        </div>
+        <div class="source-note" id="sourceHelp">Press Start Listening, choose the playing browser tab, and enable Share tab audio.</div>
+      </div>
+    </div>
+
+    <div class="source-pane" id="playerPane">
+      <div class="video-stage" id="videoStage">
+        <div class="video-empty" id="videoEmpty">Choose YouTube or a local video source, then load media.</div>
+        <iframe id="youtubeFrame" title="YouTube player" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="display:none"></iframe>
+        <video id="localVideo" controls playsinline style="display:none"></video>
+        <div id="inPlayerCaptionOverlay" class="caption-overlay">
+          <div class="caption-history" id="captionHistory"></div>
+          <div class="caption-current" id="captionCurrent">ترجمه زنده اینجا نمایش داده می‌شود</div>
+        </div>
+      </div>
+      <details class="appearance">
+        <summary>Caption appearance</summary>
+        <div class="appearance-grid">
+          <label>Font size <input id="captionSize" type="range" min="16" max="38" value="24"></label>
+          <label>Glass opacity <input id="captionOpacity" type="range" min="4" max="35" value="14"></label>
+          <label>Background blur <input id="captionBlur" type="range" min="0" max="22" value="10"></label>
+          <label>Subtitle layout <select id="captionLineMode"><option value="1">1 line</option><option value="2">2 lines</option><option value="3">3 lines</option><option value="full">Full phrase</option></select></label>
+          <label>Translation delay <span class="mono" id="translationDelayValue">3.0s</span><input id="translationDelay" type="range" min="0" max="10" step="0.5" value="3"></label>
+          <label>Reading time <span class="mono" id="readingTimeValue">3.0s</span><input id="readingTime" type="range" min="0" max="10" step="0.5" value="3"></label>
+          <label style="flex-direction:row;align-items:center;gap:10px"><input id="adaptiveTiming" type="checkbox" checked style="width:auto"> Adaptive sentence detection</label>
+          <label>Position <select id="captionPosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label>
+          <label>Alignment <select id="captionAlign"><option value="center">Centered</option><option value="right">RTL right</option></select></label>
+          <label>Speech engine <select id="audioCaptureMode"><option value="whisper">Browser Whisper + shared tab audio</option><option value="input">Chrome speech input / virtual cable (fallback)</option></select></label>
+          <label>Whisper model <select id="whisperModel"><option value="onnx-community/whisper-tiny">Tiny multilingual — fastest</option><option value="onnx-community/whisper-base">Base multilingual — better quality</option></select></label>
+          <label>Processing <select id="whisperDevice"><option value="auto">Automatic (WebGPU first)</option><option value="webgpu">WebGPU</option><option value="wasm">CPU / WASM</option></select></label>
+          <label>Audio chunk <span class="mono" id="whisperChunkValue">4.5s</span><input id="whisperChunk" type="range" min="2.5" max="10" step="0.5" value="4.5"></label>
+          <div id="whisperStatus" class="source-note" style="grid-column:span 2;margin:0"><b>Whisper:</b> model not loaded. The first start downloads and caches the model in this browser.</div>
+          <label style="justify-content:end"><button class="btn-ghost" id="preloadWhisperBtn" type="button">Preload model</button></label>
+          <label style="justify-content:end"><button class="btn-ghost" id="resetCaptionSettings" type="button">Reset settings</button></label>
+          <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;padding-top:4px">
+            <label style="flex-direction:row;align-items:center;gap:8px;margin-right:auto"><input id="realTimeSettings" type="checkbox" checked style="width:auto"> Apply changes in real time</label>
+            <span class="mono" id="settingsStatus" role="status" aria-live="polite" style="font-size:12px;color:var(--muted)">Settings ready</span>
+            <button class="btn-ghost" id="applyCaptionSettingsBtn" type="button">Apply Settings</button>
+            <button class="btn-main" id="saveCaptionSettingsBtn" type="button">Save Settings</button>
+          </div>
+        </div>
+        <div id="captionSettingsPreview" style="margin-top:14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(10,12,18,.18));padding:14px;min-height:76px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;position:relative;">
+          <div style="position:absolute;top:8px;left:10px;font:10px 'JetBrains Mono',monospace;color:var(--muted)">LIVE PREVIEW</div>
+          <div id="captionPreviewText" dir="rtl" style="font-family:'Vazirmatn',sans-serif;text-align:center;line-height:1.65;padding:7px 14px;border-radius:10px;background:rgba(8,10,16,.14);backdrop-filter:blur(10px);text-shadow:0 1px 4px #000;max-width:94%;">این یک نمونه زیرنویس برای بررسی تنظیمات است</div>
+        </div>
+        <div class="source-note" style="margin-top:10px"><b>Timing:</b> Translation delay is the maximum wait for more context. With adaptive detection enabled, Spiker translates sooner when punctuation, a natural pause, or a complete 1–2 line phrase is detected. Reading time controls the minimum time before the next subtitle replaces it.</div>
+        <div class="source-note"><b>Browser Whisper:</b> on Start, Chrome asks the user to choose the YouTube tab and enable <i>Share tab audio</i>. Audio is transcribed locally in the browser with Transformers.js—no Python server or API key. The model downloads once and is cached. WebGPU is fastest; CPU/WASM is the fallback.</div>
+      </details>
+      <div class="source-note"><b>Audio note:</b> the embedded YouTube iframe cannot expose audio directly. Press Start, select the YouTube browser tab, and enable <b>Share tab audio</b>. The app never captures a tab without this browser confirmation.</div>
+    </div>
+  </section>
+
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label for="langSelect">Language spoken in PC audio</label>
+        <select id="langSelect">
+          <option value="en-US">English</option>
+          <option value="fa-IR">Persian / Farsi</option>
+          <option value="ar-SA">Arabic</option>
+          <option value="tr-TR">Turkish</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="es-ES">Spanish</option>
+          <option value="ru-RU">Russian</option>
+          <option value="zh-CN">Chinese (Mandarin)</option>
+          <option value="hi-IN">Hindi</option>
+        </select>
+      </div>
+      <button class="btn-main" id="toggleBtn">
+        <span id="toggleIcon">▶</span> <span id="toggleLabel">Start Listening</span>
+      </button>
+      <div class="viz" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;font-family:'JetBrains Mono',monospace;"><canvas id="vizCanvas" style="display:none"></canvas><span>speech recognition active</span></div>
+    </div>
+    <div class="pc-audio-note">🔇 Uses the selected virtual audio input carrying PC sound. This version no longer opens a separate getUserMedia stream. Chrome's built-in speech recognizer may still require one one-time input permission for the site.</div>
+    <div class="footer-row">
+      <button class="btn-ghost" id="openWinBtn">▣ Open Glass Overlay</button>
+      <button class="btn-ghost" id="saveBtn">💾 Save Transcript (.txt)</button>
+      <button class="btn-ghost" id="clearBtn">Clear transcript</button>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel panel-en">
+      <h3>Original audio</h3>
+      <div class="feed" id="enFeed"><div class="empty-hint">A new translated phrase will appear every 3 seconds…</div></div>
+    </div>
+    <div class="panel panel-fa">
+      <h3>Persian translation</h3>
+      <div class="feed" id="faFeed"><div class="empty-hint" style="direction:rtl;text-align:right;font-family:'Vazirmatn',sans-serif;">ترجمه فارسی اینجا نمایش داده می‌شود…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TRANSLATION-ONLY WINDOW ============ -->
+<div id="faView" class="fa-shell" style="display:none;">
+  <header>
+    <div class="lbl">Spiker · Live Persian Caption</div>
+    <div class="lbl" id="faStatus">● waiting</div>
+  </header>
+  <div class="fa-feed" id="faOnlyFeed"></div>
+</div>
+
+<script>
+(function(){
+  const params = new URLSearchParams(location.search);
+  const isFaWindow = params.get('window') === 'translation';
+  const channel = new BroadcastChannel('spiker-fa-translate');
+
+  /* ================= TRANSLATION-ONLY WINDOW ================= */
+  if (isFaWindow) {
+    document.body.classList.add('fa-window');
+    document.getElementById('mainView').style.display = 'none';
+    document.getElementById('faView').style.display = 'flex';
+    const feed = document.getElementById('faOnlyFeed');
+    const statusEl = document.getElementById('faStatus');
+
+    channel.onmessage = (e) => {
+      const msg = e.data;
+      if (msg.type === 'status') {
+        statusEl.textContent = msg.listening ? '● live' : '● paused';
+        return;
+      }
+      if (msg.type === 'final' && msg.translated) {
+        const div = document.createElement('div');
+        div.className = 'fa-line';
+        div.textContent = msg.translated;
+        feed.appendChild(div);
+        feed.scrollTop = feed.scrollHeight;
+        // keep DOM light
+        while (feed.children.length > 6) feed.removeChild(feed.firstChild);
+      }
+    };
+    document.title = 'Spiker — Persian Caption';
+    return; // nothing else to wire up in this window
+  }
+
+  /* ================= MAIN CONTROL WINDOW ================= */
+  const toggleBtn = document.getElementById('toggleBtn');
+  const toggleIcon = document.getElementById('toggleIcon');
+  const toggleLabel = document.getElementById('toggleLabel');
+  const statusPill = document.getElementById('statusPill');
+  const statusText = document.getElementById('statusText');
+  const langSelect = document.getElementById('langSelect');
+  const enFeed = document.getElementById('enFeed');
+  const faFeed = document.getElementById('faFeed');
+  const errBanner = document.getElementById('errBanner');
+  const openWinBtn = document.getElementById('openWinBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const setupPanel = document.getElementById('setupPanel');
+  const canvas = document.getElementById('vizCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const sourceSelect = document.getElementById('sourceSelect');
+  const sourceBadge = document.getElementById('sourceBadge');
+  const youtubeControls = document.getElementById('youtubeControls');
+  const localControls = document.getElementById('localControls');
+  const sourceHelp = document.getElementById('sourceHelp');
+  const playerPane = document.getElementById('playerPane');
+  const youtubeUrl = document.getElementById('youtubeUrl');
+  const loadYoutubeBtn = document.getElementById('loadYoutubeBtn');
+  const openYoutubeBtn = document.getElementById('openYoutubeBtn');
+  const youtubeFrame = document.getElementById('youtubeFrame');
+  const localFileInput = document.getElementById('localFileInput');
+  const localFileName = document.getElementById('localFileName');
+  const localVideo = document.getElementById('localVideo');
+  const videoEmpty = document.getElementById('videoEmpty');
+  const captionOverlay = document.getElementById('inPlayerCaptionOverlay');
+  const captionHistory = document.getElementById('captionHistory');
+  const captionCurrent = document.getElementById('captionCurrent');
+  const captionSize = document.getElementById('captionSize');
+  const captionOpacity = document.getElementById('captionOpacity');
+  const captionBlur = document.getElementById('captionBlur');
+  const captionLineMode = document.getElementById('captionLineMode');
+  const translationDelay = document.getElementById('translationDelay');
+  const translationDelayValue = document.getElementById('translationDelayValue');
+  const readingTime = document.getElementById('readingTime');
+  const readingTimeValue = document.getElementById('readingTimeValue');
+  const adaptiveTiming = document.getElementById('adaptiveTiming');
+  const captionPreviewText = document.getElementById('captionPreviewText');
+  const captionPosition = document.getElementById('captionPosition');
+  const captionAlign = document.getElementById('captionAlign');
+  const audioCaptureMode = document.getElementById('audioCaptureMode');
+  const whisperModel = document.getElementById('whisperModel');
+  const whisperDevice = document.getElementById('whisperDevice');
+  const whisperChunk = document.getElementById('whisperChunk');
+  const whisperChunkValue = document.getElementById('whisperChunkValue');
+  const whisperStatus = document.getElementById('whisperStatus');
+  const preloadWhisperBtn = document.getElementById('preloadWhisperBtn');
+  const resetCaptionSettings = document.getElementById('resetCaptionSettings');
+  const realTimeSettings = document.getElementById('realTimeSettings');
+  const settingsStatus = document.getElementById('settingsStatus');
+  const applyCaptionSettingsBtn = document.getElementById('applyCaptionSettingsBtn');
+  const saveCaptionSettingsBtn = document.getElementById('saveCaptionSettingsBtn');
+  const SETTINGS_KEY = 'spiker-caption-settings-v3-browser-whisper';
+  const LEGACY_SETTINGS_KEY = 'spiker-caption-settings-v1';
+  let localObjectUrl = null;
+  let currentYoutubeId = null;
+  let inPlayerLines = [];
+
+
+  let overlayWindow = null;
+  let overlayFeed = null;
+  let overlayStatus = null;
+
+  function updateOverlayStatus(live) {
+    if (overlayStatus) overlayStatus.textContent = live ? '● live' : '● paused';
+  }
+
+  function appendOverlayTranslation(text) {
+    if (!overlayFeed || !text) return;
+    const div = overlayFeed.ownerDocument.createElement('div');
+    div.className = 'overlay-line';
+    div.textContent = text;
+    overlayFeed.appendChild(div);
+    while (overlayFeed.children.length > 3) overlayFeed.removeChild(overlayFeed.firstChild);
+  }
+
+  function buildOverlayDocument(doc) {
+    doc.head.innerHTML = `
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Spiker Glass Captions</title>
+      <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@500;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+      <style>
+        :root{color-scheme:dark;}
+        *{box-sizing:border-box;}
+        html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;}
+        body{font-family:'Vazirmatn',sans-serif;}
+        .wrap{width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:12px;background:transparent;}
+        .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:6px 10px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(8,10,15,.12);backdrop-filter:blur(12px) saturate(135%);-webkit-backdrop-filter:blur(12px) saturate(135%);box-shadow:0 6px 20px rgba(0,0,0,.14);}
+        .label{font:500 10px 'JetBrains Mono',monospace;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.78);}
+        .feed{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;overflow:hidden;}
+        .overlay-line{direction:rtl;text-align:center;color:#fff;font-size:clamp(17px,3.5vw,30px);line-height:1.65;font-weight:800;padding:7px 13px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:linear-gradient(135deg,rgba(5,7,11,.22),rgba(29,20,58,.16));backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:0 8px 24px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.05);text-shadow:0 1px 5px rgba(0,0,0,.95),0 0 1px #000;animation:in .28s ease both;}
+        .overlay-line:not(:last-child){opacity:.22;font-size:clamp(14px,2.5vw,20px);}
+        @keyframes in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+      </style>`;
+    doc.body.innerHTML = '<div class="wrap"><div class="top"><span class="label">Spiker captions</span><span class="label" id="overlayStatus">● waiting</span></div><div class="feed" id="overlayFeed"></div></div>';
+    overlayFeed = doc.getElementById('overlayFeed');
+    overlayStatus = doc.getElementById('overlayStatus');
+    updateOverlayStatus(listening);
+    transcriptRecords.slice(-3).forEach(r => { if (r.fa && r.fa !== '(translation failed)') appendOverlayTranslation(r.fa); });
+  }
+  const segmentCountdown = document.getElementById('segmentCountdown');
+
+  let recognition = null;
+  let listening = false;
+  let whisperWorker = null;
+  let whisperReady = false;
+  let whisperBusy = false;
+  let whisperQueue = [];
+  let whisperProcessor = null;
+  let whisperAudioContext = null;
+  let whisperAudioSource = null;
+  let whisperSilentGain = null;
+  let whisperSamples = [];
+  let whisperSampleCount = 0;
+  let whisperOverlapTail = new Float32Array(0);
+  let lastWhisperText = '';
+  let whisperRequestedConfig = null;
+  let starting = false;
+  let recognitionStarted = false;
+  let permissionBlocked = false;
+  let audioCtx = null, analyser = null, sourceNode = null, rafId = null, micStream = null;
+  let captureStream = null;
+  let mediaRecorder = null;
+  let sttUploadChain = Promise.resolve();
+  let activeAudioMode = 'input';
+  let restartTimer = null;
+  let restartFailCount = 0;
+  let restartAttempt = 0;
+  let recognitionWatchdog = null;
+  let lastRecognitionActivityAt = 0;
+  let transcriptRecords = []; // [{en, fa}] — kept in memory so Save works even after old DOM lines are trimmed
+  let interimTranslateTimer = null;
+  let interimRequest = null;
+  let interimFaEl = null;
+  let lastInterimText = '';
+  let lastPreview = { source: '', translated: '' };
+  let recentFinalSources = [];
+  let committedSourceTail = '';
+  let segmentFinalParts = [];
+  let segmentInterimText = '';
+  let segmentTimer = null;
+  let segmentCountdownTimer = null;
+  let segmentStartedAt = 0;
+  let lastSegmentSpeechAt = 0;
+  let translationDelayMs = 3000; // user-adjustable 0–10 seconds of silence/context
+  let readingTimeMs = 3000; // user-adjustable minimum subtitle display time
+  let adaptiveTimingEnabled = true; // finalize complete phrases before the maximum delay
+  const MIN_SEGMENT_WORDS = 3; // never translate accidental one-word fragments immediately
+  const ADAPTIVE_PAUSE_MS = 520;
+  function maxSegmentMs() { return Math.max(3800, translationDelayMs + 3000); }
+
+  function adaptiveWordTarget() {
+    const mode = captionLineMode ? captionLineMode.value : '1';
+    if (mode === '1') return 9;
+    if (mode === '2') return 16;
+    if (mode === '3') return 24;
+    return 28;
+  }
+
+  function looksLikeCompletePhrase(text, silentFor, phraseAge) {
+    if (!adaptiveTimingEnabled) return false;
+    const clean = normalizeSpeechText(text);
+    const words = clean.split(' ').filter(Boolean);
+    if (words.length < MIN_SEGMENT_WORDS) return false;
+
+    // Strong sentence boundary from recognition punctuation.
+    if (/[.!?…؛؟:]$/.test(clean)) return true;
+
+    // A short natural pause after enough context is usually a clause/sentence end.
+    if (silentFor >= ADAPTIVE_PAUSE_MS && words.length >= Math.min(7, adaptiveWordTarget())) return true;
+
+    // Fast speakers may not pause or receive punctuation. Once enough words fill
+    // roughly 1–2 subtitle lines, finalize without waiting for the full delay.
+    if (words.length >= adaptiveWordTarget() && phraseAge >= 1400) return true;
+    return false;
+  }
+  let translationDisplayQueue = [];
+  let translationDisplayTimer = null;
+  let lastTranslationShownAt = 0;
+  const translationCache = new Map();
+  const MAX_CACHE_ITEMS = 200;
+  const WATCHDOG_MS = 12000;
+  const MAX_TRANSLATION_RETRIES = 2;
+
+  function showError(msg) {
+    errBanner.textContent = msg;
+    errBanner.style.display = 'block';
+  }
+  function clearError() { errBanner.style.display = 'none'; }
+
+  function setStatus(live) {
+    listening = live;
+    statusPill.classList.toggle('live', live);
+    statusText.textContent = live ? 'LISTENING' : 'IDLE';
+    toggleLabel.textContent = live ? 'Stop Listening' : 'Start Listening';
+    toggleIcon.textContent = live ? '■' : '▶';
+    toggleBtn.classList.toggle('stop', live);
+    channel.postMessage({type:'status', listening: live});
+    updateOverlayStatus(live);
+  }
+
+  function appendEnLine(text, isFinal, replaceInterim) {
+    if (enFeed.querySelector('.empty-hint')) enFeed.innerHTML = '';
+    let interimEl = enFeed.querySelector('.line.interim');
+    if (!isFinal) {
+      if (!interimEl) {
+        interimEl = document.createElement('div');
+        interimEl.className = 'line interim';
+        enFeed.appendChild(interimEl);
+      }
+      interimEl.textContent = text;
+    } else {
+      if (interimEl) interimEl.remove();
+      const div = document.createElement('div');
+      div.className = 'line';
+      div.textContent = text;
+      enFeed.appendChild(div);
+    }
+    enFeed.scrollTop = enFeed.scrollHeight;
+  }
+
+  function appendFaPlaceholder() {
+    if (faFeed.querySelector('.empty-hint')) faFeed.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'fa-line pending';
+    div.textContent = '…';
+    faFeed.appendChild(div);
+    faFeed.scrollTop = faFeed.scrollHeight;
+    // keep the panel light so it stays fast over a long session
+    while (faFeed.children.length > 12) faFeed.removeChild(faFeed.firstChild);
+    return div;
+  }
+
+  function resolveFaPlaceholder(el, text, failed) {
+    el.classList.remove('pending');
+    if (failed) el.classList.add('failed');
+    el.textContent = text;
+    faFeed.scrollTop = faFeed.scrollHeight;
+  }
+
+  // Primary engine: Google's public translate endpoint — fast, high volume, no key.
+  function fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
+    const controller = new AbortController();
+    const outerSignal = options.signal;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (outerSignal) {
+      if (outerSignal.aborted) controller.abort();
+      else outerSignal.addEventListener('abort', () => controller.abort(), {once:true});
+    }
+    return fetch(url, {...options, signal: controller.signal})
+      .finally(() => clearTimeout(timer));
+  }
+
+  function translateViaGoogle(text, src, signal) {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${src}&tl=fa&dt=t&q=${encodeURIComponent(text)}`;
+    return fetchWithTimeout(url, {signal}, 3500).then(r => {
+      if (!r.ok) throw new Error('google http ' + r.status);
+      return r.json();
+    }).then(data => {
+      const out = (data && data[0]) ? data[0].map(chunk => chunk[0]).join('') : '';
+      if (!out) throw new Error('empty google translation');
+      return out;
+    });
+  }
+
+  // Fallback engine: MyMemory. Its free tier silently returns a warning
+  // sentence instead of an HTTP error once you hit its quota or length cap —
+  // detect those cases and treat them as failures instead of displaying them.
+  function translateViaMyMemory(text, src, signal) {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|fa`;
+    return fetchWithTimeout(url, {signal}, 5000).then(r => r.json()).then(data => {
+      const out = data && data.responseData && data.responseData.translatedText;
+      if (!out) throw new Error('empty mymemory response');
+      if (/MYMEMORY WARNING|QUOTA|INVALID LANGPAIR|LIMIT EXCEEDED|IS AN INVALID/i.test(out)) {
+        throw new Error('mymemory quota/limit hit');
+      }
+      return out;
+    });
+  }
+
+  // MyMemory caps a single query at 500 chars, and very long strings make
+  // for sluggish, all-or-nothing translations anyway — split long final
+  // transcripts into safe-sized pieces (on word boundaries), translate
+  // them in parallel, then stitch the result back into one line.
+  function chunkText(text, maxLen) {
+    if (text.length <= maxLen) return [text];
+    const parts = [];
+    let rest = text.trim();
+    while (rest.length > maxLen) {
+      let cut = rest.lastIndexOf(' ', maxLen);
+      if (cut <= 0) cut = maxLen;
+      parts.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+    return parts;
+  }
+
+  function rememberTranslation(key, value) {
+    translationCache.set(key, value);
+    if (translationCache.size > MAX_CACHE_ITEMS) {
+      translationCache.delete(translationCache.keys().next().value);
+    }
+  }
+
+  function translateChunk(chunk, src, signal) {
+    return translateViaGoogle(chunk, src, signal)
+      .catch(err => {
+        if (err && err.name === 'AbortError') throw err;
+        return translateViaMyMemory(chunk, src, signal);
+      })
+      .catch(err => {
+        if (err && err.name === 'AbortError') throw err;
+        return '⚠[' + chunk + ']';
+      });
+  }
+
+  function translateText(text, sourceLangCode, signal) {
+    const clean = text.trim();
+    const src = sourceLangCode.split('-')[0];
+    if (!clean || src === 'fa') return Promise.resolve(clean);
+    const cacheKey = src + '→fa:' + clean;
+    if (translationCache.has(cacheKey)) return Promise.resolve(translationCache.get(cacheKey));
+
+    const chunks = chunkText(clean, 450);
+    const work = chunks.length === 1
+      ? translateViaGoogle(chunks[0], src, signal).catch(err => {
+          if (err && err.name === 'AbortError') throw err;
+          return translateViaMyMemory(chunks[0], src, signal);
+        })
+      : Promise.all(chunks.map(c => translateChunk(c, src, signal))).then(results => results.join(' '));
+
+    return work.then(result => {
+      rememberTranslation(cacheKey, result);
+      return result;
+    });
+  }
+
+  function ensureInterimFaLine() {
+    if (faFeed.querySelector('.empty-hint')) faFeed.innerHTML = '';
+    if (!interimFaEl || !interimFaEl.isConnected) {
+      interimFaEl = document.createElement('div');
+      interimFaEl.className = 'fa-line pending';
+      faFeed.appendChild(interimFaEl);
+    }
+    return interimFaEl;
+  }
+
+  function clearInterimTranslation(removeLine = true) {
+    clearTimeout(interimTranslateTimer);
+    interimTranslateTimer = null;
+    if (interimRequest) interimRequest.abort();
+    interimRequest = null;
+    lastInterimText = '';
+    if (removeLine && interimFaEl && interimFaEl.isConnected) interimFaEl.remove();
+    if (removeLine) interimFaEl = null;
+  }
+
+  function normalizeSpeechText(text) {
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+
+  function mergeWithOverlap(left, right) {
+    const a = normalizeSpeechText(left);
+    const b = normalizeSpeechText(right);
+    if (!a) return b;
+    if (!b) return a;
+    const aw = a.split(' ');
+    const bw = b.split(' ');
+    let overlap = 0;
+    const max = Math.min(aw.length, bw.length, 50);
+    for (let size = max; size >= 1; size--) {
+      if (aw.slice(-size).join(' ').toLocaleLowerCase() === bw.slice(0, size).join(' ').toLocaleLowerCase()) {
+        overlap = size;
+        break;
+      }
+    }
+    return normalizeSpeechText(a + ' ' + bw.slice(overlap).join(' '));
+  }
+
+  function currentSegmentText() {
+    let text = '';
+    for (const part of segmentFinalParts) text = mergeWithOverlap(text, part);
+    return mergeWithOverlap(text, segmentInterimText);
+  }
+
+  function resetSegment() {
+    segmentFinalParts = [];
+    segmentInterimText = '';
+    const interimEl = enFeed.querySelector('.line.interim');
+    if (interimEl) interimEl.remove();
+  }
+
+  function flushTimedSegment(force = false) {
+    if (!listening && !force) return false;
+    const combined = currentSegmentText();
+    const words = normalizeSpeechText(combined).split(' ').filter(Boolean);
+    if (!words.length) return false;
+
+    const age = segmentStartedAt ? performance.now() - segmentStartedAt : 0;
+    // Chrome sometimes finalizes a single word and immediately restarts. Keep
+    // that word in the buffer instead of translating it as a complete line.
+    if (!force && words.length < MIN_SEGMENT_WORDS && age < maxSegmentMs()) return false;
+
+    resetSegment();
+    segmentStartedAt = 0;
+    lastSegmentSpeechAt = 0;
+    const freshText = getNewFinalText(combined);
+    if (freshText) {
+      appendEnLine(freshText, true);
+      queueTranslate(freshText, langSelect.value);
+      return true;
+    }
+    return false;
+  }
+
+  function updateSegmentCountdown() {
+    if (!listening || !segmentStartedAt || !lastSegmentSpeechAt) {
+      segmentCountdown.textContent = '';
+      return;
+    }
+    const silenceRemaining = Math.max(0, translationDelayMs - (performance.now() - lastSegmentSpeechAt));
+    segmentCountdown.textContent = adaptiveTimingEnabled
+      ? '· adaptive · max ' + Math.max(0, Math.ceil(silenceRemaining / 1000)) + 's'
+      : '· phrase ' + Math.max(0, Math.ceil(silenceRemaining / 1000)) + 's';
+  }
+
+  function startSegmentTimer() {
+    clearInterval(segmentTimer);
+    clearInterval(segmentCountdownTimer);
+    updateSegmentCountdown();
+    segmentTimer = setInterval(() => {
+      if (!segmentStartedAt || !lastSegmentSpeechAt) return;
+      const now = performance.now();
+      const silentFor = now - lastSegmentSpeechAt;
+      const phraseAge = now - segmentStartedAt;
+      const text = currentSegmentText();
+      const adaptiveReady = text && looksLikeCompletePhrase(text, silentFor, phraseAge);
+      if (adaptiveReady || silentFor >= translationDelayMs || phraseAge >= maxSegmentMs()) {
+        flushTimedSegment(false);
+      }
+    }, 200);
+    segmentCountdownTimer = setInterval(updateSegmentCountdown, 200);
+  }
+
+  function stopSegmentTimer(flush = false) {
+    clearInterval(segmentTimer);
+    clearInterval(segmentCountdownTimer);
+    segmentTimer = null;
+    segmentCountdownTimer = null;
+    segmentCountdown.textContent = '';
+    if (flush) flushTimedSegment(true);
+    else {
+      resetSegment();
+      segmentStartedAt = 0;
+      lastSegmentSpeechAt = 0;
+    }
+  }
+
+  // Chrome may repeat the end of the previous result after its recognition
+  // session restarts. Keep only genuinely new words so an old sentence is not
+  // translated again as part of the next line.
+  function getNewFinalText(text) {
+    const clean = normalizeSpeechText(text);
+    if (!clean) return '';
+    const key = clean.toLocaleLowerCase();
+    if (recentFinalSources.includes(key)) return '';
+
+    const previousWords = normalizeSpeechText(committedSourceTail).split(' ').filter(Boolean);
+    const currentWords = clean.split(' ').filter(Boolean);
+    let overlap = 0;
+    const max = Math.min(previousWords.length, currentWords.length, 40);
+    for (let size = max; size >= 1; size--) {
+      const left = previousWords.slice(-size).join(' ').toLocaleLowerCase();
+      const right = currentWords.slice(0, size).join(' ').toLocaleLowerCase();
+      if (left === right) { overlap = size; break; }
+    }
+
+    // Be conservative when removing overlap. Chrome often revises interim
+    // speech after a segment boundary; aggressive de-duplication can delete
+    // real words. Prefer an occasional repeated word over missing dialogue.
+    if (overlap > 0) {
+      const repeated = currentWords.slice(0, overlap).join(' ');
+      const exactDuplicate = overlap === currentWords.length &&
+        previousWords.slice(-overlap).join(' ').toLocaleLowerCase() === key;
+      if (exactDuplicate || overlap >= 5 || repeated.length >= 30) {
+        currentWords.splice(0, overlap);
+      }
+    }
+
+    const fresh = currentWords.join(' ').trim();
+    if (!fresh) return '';
+    recentFinalSources.push(key);
+    if (recentFinalSources.length > 20) recentFinalSources.shift();
+    committedSourceTail = normalizeSpeechText((committedSourceTail + ' ' + fresh).split(' ').slice(-80).join(' '));
+    return fresh;
+  }
+
+  function previewTranslate(text, sourceLangCode) {
+    const clean = text.trim();
+    if (clean.length < 3 || clean === lastInterimText) return;
+    lastInterimText = clean;
+    clearTimeout(interimTranslateTimer);
+    interimTranslateTimer = setTimeout(() => {
+      if (interimRequest) interimRequest.abort();
+      interimRequest = new AbortController();
+      const el = ensureInterimFaLine();
+      el.className = 'fa-line pending';
+      el.textContent = '…';
+      translateText(clean, sourceLangCode, interimRequest.signal)
+        .then(translated => {
+          if (clean !== lastInterimText) return;
+          lastPreview = {source: clean, translated};
+          el.className = 'fa-line';
+          el.textContent = translated;
+          faFeed.scrollTop = faFeed.scrollHeight;
+        })
+        .catch(err => {
+          if (!err || err.name !== 'AbortError') el.textContent = '…';
+        });
+    }, 320);
+  }
+
+
+  function extractYouTubeVideoId(input) {
+    const value = String(input || '').trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(value)) return value;
+    try {
+      const url = new URL(value);
+      const host = url.hostname.replace(/^www\./, '');
+      let id = null;
+      if (host === 'youtu.be') id = url.pathname.split('/').filter(Boolean)[0];
+      else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+        if (url.pathname === '/watch') id = url.searchParams.get('v');
+        else {
+          const parts = url.pathname.split('/').filter(Boolean);
+          if (['shorts','embed','live'].includes(parts[0])) id = parts[1];
+        }
+      }
+      return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+    } catch (_) { return null; }
+  }
+
+  function fitCaptionToLayout() {
+    const preferred = Math.min(38, Math.max(16, Number(captionSize.value) || 24));
+    const mode = captionLineMode.value || '1';
+    captionCurrent.style.fontSize = preferred + 'px';
+
+    // Only shrink text in strict one-line mode. Multi-line and full-phrase
+    // modes preserve the chosen font size and wrap naturally.
+    if (mode !== '1') return;
+    let size = preferred;
+    while (size > 13 && captionCurrent.scrollWidth > captionOverlay.clientWidth - 24) {
+      size -= 1;
+      captionCurrent.style.fontSize = size + 'px';
+    }
+  }
+
+  function applyCaptionLineMode() {
+    const mode = ['1','2','3','full'].includes(captionLineMode.value) ? captionLineMode.value : '1';
+    captionCurrent.classList.remove('lines-1','lines-2','lines-3','lines-full');
+    captionCurrent.classList.add('lines-' + mode);
+    requestAnimationFrame(fitCaptionToLayout);
+  }
+
+  function renderInPlayerCaption(text) {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    // Each new phrase replaces the previous subtitle. The viewer controls whether
+    // that phrase is displayed in 1, 2, 3, or unrestricted wrapped lines.
+    inPlayerLines = [clean];
+    captionHistory.innerHTML = '';
+    captionCurrent.textContent = clean;
+    requestAnimationFrame(fitCaptionToLayout);
+  }
+
+  function applyCaptionSettings(settings) {
+    const size = Math.min(38, Math.max(16, Number(settings.size) || 24));
+    const opacity = Math.min(35, Math.max(4, Number(settings.opacity) || 14));
+    const blur = Math.min(22, Math.max(0, Number(settings.blur) || 10));
+    captionSize.value = size; captionOpacity.value = opacity; captionBlur.value = blur;
+    captionLineMode.value = ['1','2','3','full'].includes(String(settings.lineMode || settings.history)) ? String(settings.lineMode || settings.history) : '1';
+    const delaySeconds = Math.min(10, Math.max(0, Number(settings.translationDelay ?? 3)));
+    const readSeconds = Math.min(10, Math.max(0, Number(settings.readingTime ?? 3)));
+    adaptiveTimingEnabled = settings.adaptiveTiming !== false;
+    adaptiveTiming.checked = adaptiveTimingEnabled;
+    translationDelay.value = delaySeconds;
+    readingTime.value = readSeconds;
+    translationDelayMs = Math.round(delaySeconds * 1000);
+    readingTimeMs = Math.round(readSeconds * 1000);
+    translationDelayValue.textContent = delaySeconds.toFixed(1) + 's';
+    readingTimeValue.textContent = readSeconds.toFixed(1) + 's';
+    captionPosition.value = ['top','center','bottom'].includes(settings.position) ? settings.position : 'bottom';
+    captionAlign.value = settings.align === 'right' ? 'right' : 'center';
+    audioCaptureMode.value = ['whisper','input'].includes(settings.audioCaptureMode) ? settings.audioCaptureMode : 'whisper';
+    whisperModel.value = ['onnx-community/whisper-tiny','onnx-community/whisper-base'].includes(settings.whisperModel) ? settings.whisperModel : 'onnx-community/whisper-tiny';
+    whisperDevice.value = ['auto','webgpu','wasm'].includes(settings.whisperDevice) ? settings.whisperDevice : 'auto';
+    whisperChunk.value = Math.min(10, Math.max(2.5, Number(settings.whisperChunk) || 4.5));
+    whisperChunkValue.textContent = Number(whisperChunk.value).toFixed(1) + 's';
+    captionOverlay.style.setProperty('--caption-size', size + 'px');
+    captionOverlay.style.setProperty('--caption-alpha', (opacity / 100).toFixed(2));
+    captionOverlay.style.setProperty('--caption-blur', blur + 'px');
+    captionOverlay.classList.toggle('pos-top', captionPosition.value === 'top');
+    captionOverlay.classList.toggle('pos-center', captionPosition.value === 'center');
+    captionOverlay.classList.toggle('align-right', captionAlign.value === 'right');
+    captionPreviewText.style.fontSize = size + 'px';
+    captionPreviewText.style.background = 'rgba(8,10,16,' + (opacity / 100).toFixed(2) + ')';
+    captionPreviewText.style.backdropFilter = 'blur(' + blur + 'px)';
+    captionPreviewText.style.webkitBackdropFilter = 'blur(' + blur + 'px)';
+    captionPreviewText.style.textAlign = captionAlign.value === 'right' ? 'right' : 'center';
+    captionPreviewText.style.display = '-webkit-box';
+    captionPreviewText.style.webkitBoxOrient = 'vertical';
+    captionPreviewText.style.overflow = captionLineMode.value === 'full' ? 'visible' : 'hidden';
+    captionPreviewText.style.webkitLineClamp = captionLineMode.value === 'full' ? 'unset' : captionLineMode.value;
+    applyCaptionLineMode();
+    renderInPlayerCaption(inPlayerLines[inPlayerLines.length - 1] || captionCurrent.textContent);
+  }
+
+  function collectCaptionSettings() {
+    return {size:captionSize.value,opacity:captionOpacity.value,blur:captionBlur.value,lineMode:captionLineMode.value,translationDelay:translationDelay.value,readingTime:readingTime.value,adaptiveTiming:adaptiveTiming.checked,position:captionPosition.value,align:captionAlign.value,audioCaptureMode:audioCaptureMode.value,whisperModel:whisperModel.value,whisperDevice:whisperDevice.value,whisperChunk:whisperChunk.value};
+  }
+
+  function setSettingsStatus(message, saved = false) {
+    settingsStatus.textContent = message;
+    settingsStatus.style.color = saved ? 'var(--teal)' : 'var(--muted)';
+  }
+
+  function applyCurrentCaptionSettings(showMessage = true) {
+    const settings = collectCaptionSettings();
+    applyCaptionSettings(settings);
+    // Reset active timing anchors so a newly selected delay is respected immediately.
+    const now = performance.now();
+    if (segmentStartedAt) segmentStartedAt = now;
+    if (lastSegmentSpeechAt) lastSegmentSpeechAt = now;
+    if (showMessage) setSettingsStatus('Applied now');
+    return settings;
+  }
+
+  function saveCaptionSettings() {
+    const settings = applyCurrentCaptionSettings(false);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    setSettingsStatus('Saved in this browser', true);
+  }
+
+  function selectSource(type) {
+    youtubeControls.style.display = type === 'youtube' ? 'flex' : 'none';
+    localControls.style.display = type === 'local-video' ? 'flex' : 'none';
+    playerPane.classList.toggle('active', type === 'youtube' || type === 'local-video');
+    const labels = {'system-audio':'SYSTEM AUDIO','youtube':'YOUTUBE','local-video':'LOCAL VIDEO','overlay-only':'OVERLAY'};
+    sourceBadge.textContent = labels[type] || 'SOURCE';
+    sourceHelp.textContent = type === 'youtube' ? 'Paste a YouTube link, load it, then press Start. Choose the YouTube tab and enable Share tab audio; Browser Whisper transcribes it locally.' :
+      type === 'local-video' ? 'Choose a local video. Press Start and share this Spiker tab with Share tab audio enabled so Browser Whisper can transcribe it.' :
+      type === 'overlay-only' ? 'Use Open Glass Overlay below and place it above any external player.' :
+      'Press Start Listening, choose the playing browser tab, and enable Share tab audio.';
+  }
+
+  function showNextQueuedTranslation() {
+    clearTimeout(translationDisplayTimer);
+    translationDisplayTimer = null;
+    if (!translationDisplayQueue.length) return;
+
+    const elapsed = performance.now() - lastTranslationShownAt;
+    const wait = lastTranslationShownAt ? Math.max(0, readingTimeMs - elapsed) : 0;
+    translationDisplayTimer = setTimeout(() => {
+      const item = translationDisplayQueue.shift();
+      if (!item) return;
+
+      const line = appendFaPlaceholder();
+      resolveFaPlaceholder(line, item.text, item.failed);
+      lastTranslationShownAt = performance.now();
+      if (!item.failed) {
+        renderInPlayerCaption(item.text);
+        channel.postMessage({type:'final', original: item.original, translated: item.text});
+        appendOverlayTranslation(item.text);
+      }
+      showNextQueuedTranslation();
+    }, wait);
+  }
+
+  function enqueueTranslationForReader(item) {
+    translationDisplayQueue.push(item);
+    showNextQueuedTranslation();
+  }
+
+  function translateWithRetry(text, sourceLangCode, attempt = 0) {
+    return translateText(text, sourceLangCode).catch(err => {
+      if (attempt >= MAX_TRANSLATION_RETRIES) throw err;
+      const delay = 500 * Math.pow(2, attempt);
+      return new Promise(resolve => setTimeout(resolve, delay))
+        .then(() => translateWithRetry(text, sourceLangCode, attempt + 1));
+    });
+  }
+
+  // Collect a short phrase and force a new subtitle every few seconds, then reveal the
+  // next translated line only after the reader has had 3 seconds with the
+  // current line. Translation work therefore happens during the reading gap.
+  function queueTranslate(text, sourceLangCode) {
+    const clean = normalizeSpeechText(text);
+    if (!clean) return;
+
+    clearInterimTranslation(true);
+    lastPreview = { source: '', translated: '' };
+    const record = { en: clean, fa: null };
+    transcriptRecords.push(record);
+
+    translateWithRetry(clean, sourceLangCode)
+      .then(translated => {
+        record.fa = translated;
+        enqueueTranslationForReader({original: clean, text: translated, failed: false});
+      })
+      .catch(() => {
+        record.fa = '(translation failed)';
+        enqueueTranslationForReader({original: clean, text: '⚠ translation failed — ' + clean, failed: true});
+      });
+  }
+
+  function initRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      showError('This browser doesn\'t support live speech recognition. Please use desktop Chrome or Edge.');
+      toggleBtn.disabled = true;
+      return null;
+    }
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = langSelect.value;
+
+    rec.onresult = (event) => {
+      const now = performance.now();
+      lastRecognitionActivityAt = now;
+      lastSegmentSpeechAt = now;
+      if (!segmentStartedAt) segmentStartedAt = now;
+      restartAttempt = 0;
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = normalizeSpeechText(event.results[i][0].transcript);
+        if (!transcript) continue;
+        if (event.results[i].isFinal) {
+          segmentFinalParts.push(transcript);
+          segmentInterimText = '';
+        } else {
+          interim = mergeWithOverlap(interim, transcript);
+        }
+      }
+
+      if (interim) segmentInterimText = interim;
+      const liveText = currentSegmentText();
+      if (liveText) appendEnLine(liveText, false);
+    };
+
+    rec.onerror = (event) => {
+      if (event.error === 'no-speech') return; // benign, keep going
+      if (event.error === 'aborted') {
+        recognitionStarted = false;
+        return;
+      }
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        permissionBlocked = true;
+        starting = false;
+        recognitionStarted = false;
+        showError('Speech-recognition input access was blocked. Chrome requires this one-time permission for its built-in recognizer, even when the selected input is a virtual cable carrying PC audio. Open the app from its normal HTTPS website address so Chrome can remember the permission.');
+        stopListening();
+        return;
+      }
+      // Temporary network/audio errors are recoverable. Do not stop the app;
+      // onend will restart recognition with backoff while preserving text.
+      restartFailCount++;
+      statusText.textContent = 'RECONNECTING…';
+    };
+
+    rec.onstart = () => {
+      restartFailCount = 0;
+      restartAttempt = 0;
+      starting = false;
+      recognitionStarted = true;
+      lastRecognitionActivityAt = performance.now();
+      setStatus(true);
+      startSegmentTimer();
+      setupPanel.removeAttribute('open');
+      clearInterval(recognitionWatchdog);
+      recognitionWatchdog = setInterval(() => {
+        if (!listening || !recognitionStarted) return;
+        if (performance.now() - lastRecognitionActivityAt > WATCHDOG_MS) {
+          // A Web Speech session can remain "started" but stop producing
+          // results. Abort it so onend creates a fresh session.
+          try { rec.abort(); } catch (_) {}
+        }
+      }, 2000);
+    };
+
+    rec.onend = () => {
+      const hadStarted = recognitionStarted;
+      recognitionStarted = false;
+      clearInterval(recognitionWatchdog);
+      recognitionWatchdog = null;
+      if (!listening || starting || permissionBlocked) return;
+
+      // Preserve everything heard before Chrome ended the session. Do not
+      // flush here: Chrome often ends after finalizing only one word. The next
+      // recognition session continues filling the same phrase buffer.
+      if (hadStarted && currentSegmentText()) {
+        if (!segmentStartedAt) segmentStartedAt = performance.now();
+        if (!lastSegmentSpeechAt) lastSegmentSpeechAt = performance.now();
+      }
+      updateSegmentCountdown();
+
+      clearTimeout(restartTimer);
+      const delay = Math.min(4000, 250 * Math.pow(2, restartAttempt++));
+      statusText.textContent = 'RECONNECTING…';
+      restartTimer = setTimeout(() => {
+        if (!listening || permissionBlocked) return;
+        try { rec.start(); }
+        catch (_) {
+          // Trigger the same retry path without asking for permission again.
+          restartTimer = setTimeout(() => {
+            if (!listening || permissionBlocked) return;
+            try { rec.start(); } catch (_) {}
+          }, Math.min(4000, delay + 500));
+        }
+      }, delay);
+    };
+
+    return rec;
+  }
+
+  function drawViz() {
+    const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+    const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    function frame() {
+      rafId = requestAnimationFrame(frame);
+      analyser.getByteFrequencyData(data);
+      ctx.clearRect(0,0,w,h);
+      const barCount = 40;
+      const step = Math.floor(data.length / barCount);
+      const barW = w / barCount;
+      for (let i=0;i<barCount;i++){
+        const v = data[i*step] / 255;
+        const barH = Math.max(2, v*h);
+        ctx.fillStyle = 'rgba(79,216,199,' + (0.35+v*0.65) + ')';
+        ctx.fillRect(i*barW+1, h-barH, barW-2, barH);
+      }
+    }
+    frame();
+  }
+
+
+  function feedExternalTranscript(text) {
+    const clean = normalizeSpeechText(text);
+    if (!clean) return;
+    const previousWords = normalizeSpeechText(lastWhisperText).split(' ').filter(Boolean);
+    const currentWords = clean.split(' ').filter(Boolean);
+    let overlap = 0;
+    for (let size = Math.min(previousWords.length, currentWords.length, 18); size >= 1; size--) {
+      if (previousWords.slice(-size).join(' ').toLocaleLowerCase() === currentWords.slice(0, size).join(' ').toLocaleLowerCase()) { overlap = size; break; }
+    }
+    const fresh = currentWords.slice(overlap).join(' ').trim();
+    lastWhisperText = clean;
+    if (!fresh) return;
+    const now = performance.now();
+    lastRecognitionActivityAt = now;
+    lastSegmentSpeechAt = now;
+    if (!segmentStartedAt) segmentStartedAt = now;
+    segmentFinalParts.push(fresh);
+    const liveText = currentSegmentText();
+    if (liveText) appendEnLine(liveText, false);
+    const age = now - segmentStartedAt;
+    if (looksLikeCompletePhrase(liveText, ADAPTIVE_PAUSE_MS, age) || age >= maxSegmentMs()) {
+      flushSegment();
+    }
+  }
+
+  function setWhisperStatus(message, kind = 'normal') {
+    if (!whisperStatus) return;
+    const prefix = kind === 'error' ? '⚠' : kind === 'ready' ? '✓' : '•';
+    whisperStatus.innerHTML = '<b>Whisper:</b> ' + prefix + ' ' + message;
+  }
+
+  function languageForWhisper(locale) {
+    const map = {
+      'en-US':'english','fa-IR':'persian','ar-SA':'arabic','tr-TR':'turkish',
+      'fr-FR':'french','de-DE':'german','es-ES':'spanish','ru-RU':'russian',
+      'zh-CN':'chinese','hi-IN':'hindi'
+    };
+    return map[locale] || null;
+  }
+
+  function createWhisperWorker() {
+    if (whisperWorker) return whisperWorker;
+    const workerSource = `
+      import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+      env.allowLocalModels = false;
+      let transcriber = null;
+      let activeKey = '';
+      async function load(config) {
+        const requested = config.device === 'auto' ? (self.navigator && self.navigator.gpu ? 'webgpu' : 'wasm') : config.device;
+        const key = config.model + '|' + requested;
+        if (transcriber && activeKey === key) return {device: requested};
+        self.postMessage({type:'status', message:'Downloading/loading ' + config.model.split('/').pop() + ' on ' + requested + '…'});
+        try {
+          transcriber = await pipeline('automatic-speech-recognition', config.model, {
+            device: requested,
+            dtype: requested === 'webgpu' ? {encoder_model:'fp16', decoder_model_merged:'q4'} : 'q8'
+          });
+          activeKey = key;
+          return {device: requested};
+        } catch (error) {
+          if (requested === 'webgpu' && config.device === 'auto') {
+            self.postMessage({type:'status', message:'WebGPU unavailable; loading CPU/WASM…'});
+            transcriber = await pipeline('automatic-speech-recognition', config.model, {device:'wasm', dtype:'q8'});
+            activeKey = config.model + '|wasm';
+            return {device:'wasm'};
+          }
+          throw error;
+        }
+      }
+      self.onmessage = async (event) => {
+        const msg = event.data;
+        try {
+          if (msg.type === 'load') {
+            const info = await load(msg.config);
+            self.postMessage({type:'ready', device:info.device});
+          } else if (msg.type === 'transcribe') {
+            const info = await load(msg.config);
+            const audio = new Float32Array(msg.audio);
+            const options = {task:'transcribe', return_timestamps:false};
+            if (msg.language) options.language = msg.language;
+            const result = await transcriber(audio, options);
+            self.postMessage({type:'result', id:msg.id, text:(result && result.text || '').trim(), device:info.device});
+          }
+        } catch (error) {
+          self.postMessage({type:'error', id:msg.id, message:error && error.message ? error.message : String(error)});
+        }
+      };
+    `;
+    const url = URL.createObjectURL(new Blob([workerSource], {type:'text/javascript'}));
+    whisperWorker = new Worker(url, {type:'module'});
+    URL.revokeObjectURL(url);
+    whisperWorker.onmessage = (event) => {
+      const msg = event.data || {};
+      if (msg.type === 'status') setWhisperStatus(msg.message);
+      if (msg.type === 'ready') {
+        whisperReady = true;
+        setWhisperStatus('ready on ' + msg.device + '.', 'ready');
+        processWhisperQueue();
+      }
+      if (msg.type === 'result') {
+        whisperBusy = false;
+        if (msg.text) feedExternalTranscript(msg.text);
+        setWhisperStatus('listening and transcribing on ' + msg.device + (whisperQueue.length ? ' · ' + whisperQueue.length + ' queued' : '') + '.', 'ready');
+        processWhisperQueue();
+      }
+      if (msg.type === 'error') {
+        whisperBusy = false;
+        setWhisperStatus(msg.message, 'error');
+        showError('Browser Whisper problem: ' + msg.message + '. Try the Tiny model or CPU/WASM mode.');
+        processWhisperQueue();
+      }
+    };
+    whisperWorker.onerror = (event) => {
+      whisperBusy = false;
+      setWhisperStatus(event.message || 'worker failed', 'error');
+    };
+    return whisperWorker;
+  }
+
+  function currentWhisperConfig() {
+    return {model: whisperModel.value, device: whisperDevice.value};
+  }
+
+  function loadWhisperModel() {
+    whisperReady = false;
+    whisperRequestedConfig = currentWhisperConfig();
+    setWhisperStatus('preparing model…');
+    createWhisperWorker().postMessage({type:'load', config:whisperRequestedConfig});
+  }
+
+  function processWhisperQueue() {
+    if (!whisperWorker || !whisperReady || whisperBusy || !whisperQueue.length) return;
+    whisperBusy = true;
+    const item = whisperQueue.shift();
+    whisperWorker.postMessage({
+      type:'transcribe', id:item.id, config:item.config,
+      language:item.language, audio:item.audio.buffer
+    }, [item.audio.buffer]);
+  }
+
+  function queueWhisperAudio(audio) {
+    if (!audio || audio.length < 8000) return;
+    whisperQueue.push({
+      id: Date.now() + '-' + Math.random().toString(16).slice(2),
+      audio,
+      language: languageForWhisper(langSelect.value),
+      config: currentWhisperConfig()
+    });
+    // Keep every chunk in order. Warn instead of silently dropping speech.
+    if (whisperQueue.length > 3) setWhisperStatus('processing behind live audio (' + whisperQueue.length + ' chunks queued). Choose Tiny/WebGPU for lower latency.');
+    processWhisperQueue();
+  }
+
+  function concatFloat32(parts, total) {
+    const out = new Float32Array(total);
+    let offset = 0;
+    for (const part of parts) { out.set(part, offset); offset += part.length; }
+    return out;
+  }
+
+  function resampleTo16k(input, sourceRate) {
+    if (sourceRate === 16000) return new Float32Array(input);
+    const ratio = sourceRate / 16000;
+    const outLength = Math.max(1, Math.round(input.length / ratio));
+    const out = new Float32Array(outLength);
+    for (let i = 0; i < outLength; i++) {
+      const start = Math.floor(i * ratio);
+      const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+      let sum = 0;
+      for (let j = start; j < end; j++) sum += input[j];
+      out[i] = sum / Math.max(1, end - start);
+    }
+    return out;
+  }
+
+  function flushWhisperAudio(force = false) {
+    const targetSamples = Math.round(Number(whisperChunk.value || 4.5) * 16000);
+    if (!force && whisperSampleCount < targetSamples) return;
+    if (!whisperSampleCount) return;
+    const fresh = concatFloat32(whisperSamples, whisperSampleCount);
+    whisperSamples = [];
+    whisperSampleCount = 0;
+    const combined = new Float32Array(whisperOverlapTail.length + fresh.length);
+    combined.set(whisperOverlapTail, 0);
+    combined.set(fresh, whisperOverlapTail.length);
+    const overlapSamples = Math.min(combined.length, Math.round(0.65 * 16000));
+    whisperOverlapTail = combined.slice(combined.length - overlapSamples);
+    queueWhisperAudio(combined);
+  }
+
+  async function startTabAudioCapture() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      throw new Error('Tab audio capture is not supported by this browser.');
+    }
+    loadWhisperModel();
+    captureStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false},
+      preferCurrentTab: true,
+      selfBrowserSurface: 'include',
+      surfaceSwitching: 'include',
+      systemAudio: 'include'
+    });
+    const audioTracks = captureStream.getAudioTracks();
+    if (!audioTracks.length) {
+      captureStream.getTracks().forEach(t => t.stop());
+      captureStream = null;
+      throw new Error('No shared audio was received. Select the YouTube tab and enable “Share tab audio”.');
+    }
+    captureStream.getVideoTracks().forEach(t => { t.enabled = false; });
+    const audioOnly = new MediaStream(audioTracks);
+    whisperAudioContext = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+    await whisperAudioContext.resume();
+    whisperAudioSource = whisperAudioContext.createMediaStreamSource(audioOnly);
+    // ScriptProcessor remains broadly compatible for a static no-build app.
+    whisperProcessor = whisperAudioContext.createScriptProcessor(4096, 1, 1);
+    whisperSilentGain = whisperAudioContext.createGain();
+    whisperSilentGain.gain.value = 0;
+    whisperProcessor.onaudioprocess = (event) => {
+      if (!listening || activeAudioMode !== 'tab') return;
+      const mono = event.inputBuffer.getChannelData(0);
+      const pcm16k = resampleTo16k(mono, whisperAudioContext.sampleRate);
+      whisperSamples.push(pcm16k);
+      whisperSampleCount += pcm16k.length;
+      flushWhisperAudio(false);
+    };
+    whisperAudioSource.connect(whisperProcessor);
+    whisperProcessor.connect(whisperSilentGain);
+    whisperSilentGain.connect(whisperAudioContext.destination);
+    const ended = () => { if (listening && activeAudioMode === 'tab') stopListening(); };
+    captureStream.getTracks().forEach(t => t.addEventListener('ended', ended, {once:true}));
+    activeAudioMode = 'tab';
+    recognitionStarted = true;
+    starting = false;
+    setStatus(true);
+    statusText.textContent = 'WHISPER';
+    startSegmentTimer();
+    setupPanel.removeAttribute('open');
+  }
+
+  async function startListening() {
+    if (starting || listening) return;
+    clearError();
+    starting = true;
+    permissionBlocked = false;
+    toggleBtn.disabled = true;
+    statusText.textContent = 'STARTING…';
+
+    const requestedMode = audioCaptureMode.value;
+    try {
+      if (requestedMode === 'whisper') {
+        await startTabAudioCapture();
+        saveCaptionSettings();
+        return;
+      }
+
+      activeAudioMode = 'input';
+      recognition = initRecognition();
+      if (!recognition) {
+        starting = false;
+        return;
+      }
+      recognition.lang = langSelect.value;
+      recognition.start();
+    } catch (err) {
+      starting = false;
+      recognitionStarted = false;
+      setStatus(false);
+      showError('Could not start audio transcription: ' + err.message);
+    } finally {
+      toggleBtn.disabled = false;
+    }
+  }
+
+  function stopListening() {
+    starting = false;
+    recognitionStarted = false;
+    stopSegmentTimer(true);
+    setStatus(false);
+    clearInterimTranslation();
+    clearTimeout(restartTimer);
+    clearInterval(recognitionWatchdog);
+    recognitionWatchdog = null;
+    if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+    flushWhisperAudio(true);
+    if (whisperProcessor) { try { whisperProcessor.disconnect(); } catch(e){} whisperProcessor.onaudioprocess = null; }
+    if (whisperAudioSource) { try { whisperAudioSource.disconnect(); } catch(e){} }
+    if (whisperSilentGain) { try { whisperSilentGain.disconnect(); } catch(e){} }
+    if (whisperAudioContext) { try { whisperAudioContext.close(); } catch(e){} }
+    whisperProcessor = null; whisperAudioSource = null; whisperSilentGain = null; whisperAudioContext = null;
+    whisperSamples = []; whisperSampleCount = 0; whisperOverlapTail = new Float32Array(0);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') { try { mediaRecorder.stop(); } catch(e){} }
+    mediaRecorder = null;
+    if (captureStream) captureStream.getTracks().forEach(t => t.stop());
+    captureStream = null;
+    activeAudioMode = 'input';
+    if (rafId) cancelAnimationFrame(rafId);
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+    if (audioCtx) audioCtx.close();
+    audioCtx = null;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    if (listening || starting) stopListening(); else startListening();
+  });
+
+  langSelect.addEventListener('change', () => {
+    if (recognition) recognition.lang = langSelect.value;
+  });
+
+  openWinBtn.addEventListener('click', async () => {
+    clearError();
+    try {
+      if ('documentPictureInPicture' in window) {
+        if (overlayWindow && !overlayWindow.closed) {
+          overlayWindow.focus();
+          return;
+        }
+        overlayWindow = await window.documentPictureInPicture.requestWindow({width: 760, height: 220});
+        buildOverlayDocument(overlayWindow.document);
+        overlayWindow.addEventListener('pagehide', () => {
+          overlayWindow = null;
+          overlayFeed = null;
+          overlayStatus = null;
+        }, {once:true});
+        return;
+      }
+      const popup = window.open(location.pathname + '?window=translation', 'SpikerTranslation', 'popup=yes,width=860,height=300,toolbar=no,menubar=no,location=no,status=no,scrollbars=no,resizable=yes');
+      if (!popup) throw new Error('The overlay window was blocked by the browser. Allow pop-ups for this page and try again.');
+    } catch (err) {
+      showError('Could not open the glass overlay: ' + err.message + ' Use current Chrome or Edge on the published HTTPS website, and allow Picture-in-Picture/pop-ups.');
+    }
+  });
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.addEventListener('click', () => {
+    if (!transcriptRecords.length) {
+      showError('Nothing to save yet — start listening first.');
+      return;
+    }
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[:.]/g, '-');
+    let out = 'Spiker — Live Transcript\nGenerated: ' + now.toLocaleString() + '\n';
+    out += '========================================\n\n';
+    transcriptRecords.forEach((r, i) => {
+      out += `#${i + 1}\n[EN] ${r.en}\n[FA] ${r.fa || '(pending)'}\n\n`;
+    });
+    const blob = new Blob(['\uFEFF' + out], {type: 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `spiker-transcript-${stamp}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    clearInterimTranslation();
+    resetSegment();
+    transcriptRecords = [];
+    translationCache.clear();
+    lastPreview = { source: '', translated: '' };
+    enFeed.innerHTML = '<div class="empty-hint">A new translated phrase will appear every 3 seconds…</div>';
+    faFeed.innerHTML = '<div class="empty-hint" style="direction:rtl;text-align:right;font-family:\'Vazirmatn\',sans-serif;">ترجمه فارسی اینجا نمایش داده می‌شود…</div>';
+  });
+
+
+  sourceSelect.addEventListener('change', () => selectSource(sourceSelect.value));
+  loadYoutubeBtn.addEventListener('click', () => {
+    const id = extractYouTubeVideoId(youtubeUrl.value);
+    if (!id) { showError('That does not look like a valid YouTube link or 11-character video ID.'); return; }
+
+    // Spiker is a static web app. Publish the files on any HTTPS static host.
+    // Opening by double-clicking uses file://, where browser media APIs and
+    // YouTube embeds may be restricted. No localhost or backend is required.
+    if (location.protocol === 'file:') {
+      youtubeFrame.src = '';
+      youtubeFrame.style.display = 'none';
+      localVideo.style.display = 'none';
+      videoEmpty.style.display = 'flex';
+      videoEmpty.innerHTML = '<div style="max-width:680px;padding:28px;text-align:center;line-height:1.7">' +
+        '<b style="font-size:20px;color:#fff">Publish Spiker as a normal HTTPS website</b><br>' +
+        '<span style="color:#aeb5c6">This page was opened directly from your device with <code>file://</code>. Upload the included files to GitHub Pages, Netlify, Cloudflare Pages, Vercel, or any HTTPS web host, then open the public website address.</span><br>' +
+        '<span style="display:inline-block;margin-top:12px;color:#4fd8c7">No localhost, Python server, database, or backend is needed.</span>' +
+        '</div>';
+      showError('Direct file mode is restricted by the browser. Publish these static files on any HTTPS website host; no localhost is needed.');
+      return;
+    }
+
+    clearError();
+    currentYoutubeId = id;
+    const origin = location.origin;
+    const params = new URLSearchParams({
+      rel: '0',
+      playsinline: '1',
+      enablejsapi: '1',
+      origin
+    });
+    youtubeFrame.src = 'https://www.youtube.com/embed/' + encodeURIComponent(id) + '?' + params.toString();
+    youtubeFrame.style.display = 'block';
+    localVideo.style.display = 'none';
+    videoEmpty.style.display = 'none';
+  });
+  youtubeUrl.addEventListener('keydown', e => { if (e.key === 'Enter') loadYoutubeBtn.click(); });
+  openYoutubeBtn.addEventListener('click', () => {
+    const id = extractYouTubeVideoId(youtubeUrl.value) || currentYoutubeId;
+    if (!id) { showError('Paste a valid YouTube link first.'); return; }
+    window.open('https://www.youtube.com/watch?v=' + encodeURIComponent(id), '_blank', 'noopener');
+  });
+  localFileInput.addEventListener('change', () => {
+    const file = localFileInput.files && localFileInput.files[0]; if (!file) return;
+    if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
+    localObjectUrl = URL.createObjectURL(file); localVideo.src = localObjectUrl;
+    localVideo.style.display = 'block'; youtubeFrame.style.display = 'none'; youtubeFrame.src = ''; videoEmpty.style.display = 'none';
+    localFileName.textContent = file.name;
+  });
+  preloadWhisperBtn.addEventListener('click', () => {
+    clearError();
+    preloadWhisperBtn.disabled = true;
+    loadWhisperModel();
+    const restore = () => { preloadWhisperBtn.disabled = false; };
+    setTimeout(restore, 2500);
+  });
+
+  const captionSettingControls = [captionSize,captionOpacity,captionBlur,captionLineMode,translationDelay,readingTime,adaptiveTiming,captionPosition,captionAlign,audioCaptureMode,whisperModel,whisperDevice,whisperChunk];
+  captionSettingControls.forEach(el => {
+    const eventName = (el.tagName === 'SELECT' || el.type === 'checkbox') ? 'change' : 'input';
+    el.addEventListener(eventName, () => {
+      translationDelayValue.textContent = Number(translationDelay.value).toFixed(1) + 's';
+      readingTimeValue.textContent = Number(readingTime.value).toFixed(1) + 's';
+      whisperChunkValue.textContent = Number(whisperChunk.value).toFixed(1) + 's';
+      setSettingsStatus('Unsaved changes');
+      if (realTimeSettings.checked) applyCurrentCaptionSettings(false);
+    });
+  });
+  realTimeSettings.addEventListener('change', () => {
+    if (realTimeSettings.checked) applyCurrentCaptionSettings();
+    else setSettingsStatus('Real-time apply off');
+  });
+  applyCaptionSettingsBtn.addEventListener('click', () => applyCurrentCaptionSettings());
+  saveCaptionSettingsBtn.addEventListener('click', saveCaptionSettings);
+  [whisperModel, whisperDevice].forEach(el => el.addEventListener('change', () => { whisperReady = false; whisperQueue = []; if (whisperWorker) { whisperWorker.terminate(); whisperWorker = null; } setWhisperStatus('model setting changed; it will load on next Start.'); }));
+  resetCaptionSettings.addEventListener('click', () => { localStorage.removeItem(SETTINGS_KEY); localStorage.removeItem(LEGACY_SETTINGS_KEY); applyCaptionSettings({}); saveCaptionSettings(); });
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(LEGACY_SETTINGS_KEY) || '{}';
+    applyCaptionSettings(JSON.parse(raw));
+  } catch (_) { applyCaptionSettings({}); }
+  selectSource(sourceSelect.value);
+
+  function updateBrowserReadiness() {
+    const secure = window.isSecureContext && location.protocol === 'https:';
+    const capture = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+    const gpu = !!navigator.gpu;
+    const set = (id, textId, ok, text) => {
+      const el = document.getElementById(id);
+      el.classList.toggle('ok', ok); el.classList.toggle('bad', !ok);
+      document.getElementById(textId).textContent = text;
+    };
+    set('secureReady','secureReadyText',secure,secure ? 'HTTPS website ready' : 'Publish on an HTTPS website');
+    set('captureReady','captureReadyText',capture,capture ? 'sharing API available' : 'not supported in this browser');
+    set('gpuReady','gpuReadyText',true,gpu ? 'WebGPU available' : 'CPU / WASM fallback');
+  }
+  updateBrowserReadiness();
+
+  window.addEventListener('beforeunload', () => {
+    if (listening) stopListening();
+    if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
+  });
+})();
+</script>
+</body>
+</html>
