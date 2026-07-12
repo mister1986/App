@@ -1,0 +1,11 @@
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
+    Permissions-Policy = "microphone=(self), display-capture=(self), picture-in-picture=(self)"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
