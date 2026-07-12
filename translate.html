@@ -292,12 +292,26 @@
           <label>Glass opacity <input id="captionOpacity" type="range" min="4" max="35" value="14"></label>
           <label>Background blur <input id="captionBlur" type="range" min="0" max="22" value="10"></label>
           <label>Subtitle layout <select id="captionLineMode"><option value="1">1 line</option><option value="2">2 lines</option><option value="3">3 lines</option><option value="full">Full phrase</option></select></label>
+          <label>Translation delay <span class="mono" id="translationDelayValue">3.0s</span><input id="translationDelay" type="range" min="0" max="10" step="0.5" value="3"></label>
+          <label>Reading time <span class="mono" id="readingTimeValue">3.0s</span><input id="readingTime" type="range" min="0" max="10" step="0.5" value="3"></label>
+          <label style="flex-direction:row;align-items:center;gap:10px"><input id="adaptiveTiming" type="checkbox" checked style="width:auto"> Adaptive sentence detection</label>
           <label>Position <select id="captionPosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label>
           <label>Alignment <select id="captionAlign"><option value="center">Centered</option><option value="right">RTL right</option></select></label>
-          <label style="justify-content:end"><button class="btn-ghost" id="resetCaptionSettings" type="button">Reset appearance</button></label>
+          <label>Speech engine <select id="audioCaptureMode"><option value="whisper">Browser Whisper + shared tab audio</option><option value="input">Chrome speech input / virtual cable (fallback)</option></select></label>
+          <label>Whisper model <select id="whisperModel"><option value="onnx-community/whisper-tiny">Tiny multilingual — fastest</option><option value="onnx-community/whisper-base">Base multilingual — better quality</option></select></label>
+          <label>Processing <select id="whisperDevice"><option value="auto">Automatic (WebGPU first)</option><option value="webgpu">WebGPU</option><option value="wasm">CPU / WASM</option></select></label>
+          <label>Audio chunk <span class="mono" id="whisperChunkValue">4.5s</span><input id="whisperChunk" type="range" min="2.5" max="10" step="0.5" value="4.5"></label>
+          <div id="whisperStatus" class="source-note" style="grid-column:span 2;margin:0"><b>Whisper:</b> model not loaded. The first start downloads and caches the model in this browser.</div>
+          <label style="justify-content:end"><button class="btn-ghost" id="resetCaptionSettings" type="button">Reset settings</button></label>
         </div>
+        <div id="captionSettingsPreview" style="margin-top:14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(10,12,18,.18));padding:14px;min-height:76px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;position:relative;">
+          <div style="position:absolute;top:8px;left:10px;font:10px 'JetBrains Mono',monospace;color:var(--muted)">LIVE PREVIEW</div>
+          <div id="captionPreviewText" dir="rtl" style="font-family:'Vazirmatn',sans-serif;text-align:center;line-height:1.65;padding:7px 14px;border-radius:10px;background:rgba(8,10,16,.14);backdrop-filter:blur(10px);text-shadow:0 1px 4px #000;max-width:94%;">این یک نمونه زیرنویس برای بررسی تنظیمات است</div>
+        </div>
+        <div class="source-note" style="margin-top:10px"><b>Timing:</b> Translation delay is the maximum wait for more context. With adaptive detection enabled, Spiker translates sooner when punctuation, a natural pause, or a complete 1–2 line phrase is detected. Reading time controls the minimum time before the next subtitle replaces it.</div>
+        <div class="source-note"><b>Browser Whisper:</b> on Start, Chrome asks the user to choose the YouTube tab and enable <i>Share tab audio</i>. Audio is transcribed locally in the browser with Transformers.js—no Python server or API key. The model downloads once and is cached. WebGPU is fastest; CPU/WASM is the fallback.</div>
       </details>
-      <div class="source-note"><b>Audio note:</b> a YouTube iframe cannot directly give its audio to JavaScript. Keep the virtual audio cable selected as Chrome’s input, or use a future authorized tab-capture workflow.</div>
+      <div class="source-note"><b>Audio note:</b> the embedded YouTube iframe cannot expose audio directly. Press Start, select the YouTube browser tab, and enable <b>Share tab audio</b>. The app never captures a tab without this browser confirmation.</div>
     </div>
   </section>
 
@@ -423,10 +437,23 @@
   const captionOpacity = document.getElementById('captionOpacity');
   const captionBlur = document.getElementById('captionBlur');
   const captionLineMode = document.getElementById('captionLineMode');
+  const translationDelay = document.getElementById('translationDelay');
+  const translationDelayValue = document.getElementById('translationDelayValue');
+  const readingTime = document.getElementById('readingTime');
+  const readingTimeValue = document.getElementById('readingTimeValue');
+  const adaptiveTiming = document.getElementById('adaptiveTiming');
+  const captionPreviewText = document.getElementById('captionPreviewText');
   const captionPosition = document.getElementById('captionPosition');
   const captionAlign = document.getElementById('captionAlign');
+  const audioCaptureMode = document.getElementById('audioCaptureMode');
+  const whisperModel = document.getElementById('whisperModel');
+  const whisperDevice = document.getElementById('whisperDevice');
+  const whisperChunk = document.getElementById('whisperChunk');
+  const whisperChunkValue = document.getElementById('whisperChunkValue');
+  const whisperStatus = document.getElementById('whisperStatus');
   const resetCaptionSettings = document.getElementById('resetCaptionSettings');
-  const SETTINGS_KEY = 'spiker-caption-settings-v1';
+  const SETTINGS_KEY = 'spiker-caption-settings-v3-browser-whisper';
+  const LEGACY_SETTINGS_KEY = 'spiker-caption-settings-v1';
   let localObjectUrl = null;
   let currentYoutubeId = null;
   let inPlayerLines = [];
@@ -478,10 +505,27 @@
 
   let recognition = null;
   let listening = false;
+  let whisperWorker = null;
+  let whisperReady = false;
+  let whisperBusy = false;
+  let whisperQueue = [];
+  let whisperProcessor = null;
+  let whisperAudioContext = null;
+  let whisperAudioSource = null;
+  let whisperSilentGain = null;
+  let whisperSamples = [];
+  let whisperSampleCount = 0;
+  let whisperOverlapTail = new Float32Array(0);
+  let lastWhisperText = '';
+  let whisperRequestedConfig = null;
   let starting = false;
   let recognitionStarted = false;
   let permissionBlocked = false;
   let audioCtx = null, analyser = null, sourceNode = null, rafId = null, micStream = null;
+  let captureStream = null;
+  let mediaRecorder = null;
+  let sttUploadChain = Promise.resolve();
+  let activeAudioMode = 'input';
   let restartTimer = null;
   let restartFailCount = 0;
   let restartAttempt = 0;
@@ -501,10 +545,38 @@
   let segmentCountdownTimer = null;
   let segmentStartedAt = 0;
   let lastSegmentSpeechAt = 0;
-  const SEGMENT_MS = 3000; // translate after 3 seconds of silence
-  const MAX_SEGMENT_MS = 3800; // force a fresh subtitle during nonstop speech
+  let translationDelayMs = 3000; // user-adjustable 0–10 seconds of silence/context
+  let readingTimeMs = 3000; // user-adjustable minimum subtitle display time
+  let adaptiveTimingEnabled = true; // finalize complete phrases before the maximum delay
   const MIN_SEGMENT_WORDS = 3; // never translate accidental one-word fragments immediately
-  const DISPLAY_GAP_MS = 3000; // keep each translated line readable for at least 3 seconds
+  const ADAPTIVE_PAUSE_MS = 520;
+  function maxSegmentMs() { return Math.max(3800, translationDelayMs + 3000); }
+
+  function adaptiveWordTarget() {
+    const mode = captionLineMode ? captionLineMode.value : '1';
+    if (mode === '1') return 9;
+    if (mode === '2') return 16;
+    if (mode === '3') return 24;
+    return 28;
+  }
+
+  function looksLikeCompletePhrase(text, silentFor, phraseAge) {
+    if (!adaptiveTimingEnabled) return false;
+    const clean = normalizeSpeechText(text);
+    const words = clean.split(' ').filter(Boolean);
+    if (words.length < MIN_SEGMENT_WORDS) return false;
+
+    // Strong sentence boundary from recognition punctuation.
+    if (/[.!?…؛؟:]$/.test(clean)) return true;
+
+    // A short natural pause after enough context is usually a clause/sentence end.
+    if (silentFor >= ADAPTIVE_PAUSE_MS && words.length >= Math.min(7, adaptiveWordTarget())) return true;
+
+    // Fast speakers may not pause or receive punctuation. Once enough words fill
+    // roughly 1–2 subtitle lines, finalize without waiting for the full delay.
+    if (words.length >= adaptiveWordTarget() && phraseAge >= 1400) return true;
+    return false;
+  }
   let translationDisplayQueue = [];
   let translationDisplayTimer = null;
   let lastTranslationShownAt = 0;
@@ -732,7 +804,7 @@
     const age = segmentStartedAt ? performance.now() - segmentStartedAt : 0;
     // Chrome sometimes finalizes a single word and immediately restarts. Keep
     // that word in the buffer instead of translating it as a complete line.
-    if (!force && words.length < MIN_SEGMENT_WORDS && age < MAX_SEGMENT_MS) return false;
+    if (!force && words.length < MIN_SEGMENT_WORDS && age < maxSegmentMs()) return false;
 
     resetSegment();
     segmentStartedAt = 0;
@@ -751,8 +823,10 @@
       segmentCountdown.textContent = '';
       return;
     }
-    const silenceRemaining = Math.max(0, SEGMENT_MS - (performance.now() - lastSegmentSpeechAt));
-    segmentCountdown.textContent = '· phrase ' + Math.max(1, Math.ceil(silenceRemaining / 1000)) + 's';
+    const silenceRemaining = Math.max(0, translationDelayMs - (performance.now() - lastSegmentSpeechAt));
+    segmentCountdown.textContent = adaptiveTimingEnabled
+      ? '· adaptive · max ' + Math.max(0, Math.ceil(silenceRemaining / 1000)) + 's'
+      : '· phrase ' + Math.max(0, Math.ceil(silenceRemaining / 1000)) + 's';
   }
 
   function startSegmentTimer() {
@@ -764,7 +838,9 @@
       const now = performance.now();
       const silentFor = now - lastSegmentSpeechAt;
       const phraseAge = now - segmentStartedAt;
-      if (silentFor >= SEGMENT_MS || phraseAge >= MAX_SEGMENT_MS) {
+      const text = currentSegmentText();
+      const adaptiveReady = text && looksLikeCompletePhrase(text, silentFor, phraseAge);
+      if (adaptiveReady || silentFor >= translationDelayMs || phraseAge >= maxSegmentMs()) {
         flushTimedSegment(false);
       }
     }, 200);
@@ -908,20 +984,45 @@
     const blur = Math.min(22, Math.max(0, Number(settings.blur) || 10));
     captionSize.value = size; captionOpacity.value = opacity; captionBlur.value = blur;
     captionLineMode.value = ['1','2','3','full'].includes(String(settings.lineMode || settings.history)) ? String(settings.lineMode || settings.history) : '1';
+    const delaySeconds = Math.min(10, Math.max(0, Number(settings.translationDelay ?? 3)));
+    const readSeconds = Math.min(10, Math.max(0, Number(settings.readingTime ?? 3)));
+    adaptiveTimingEnabled = settings.adaptiveTiming !== false;
+    adaptiveTiming.checked = adaptiveTimingEnabled;
+    translationDelay.value = delaySeconds;
+    readingTime.value = readSeconds;
+    translationDelayMs = Math.round(delaySeconds * 1000);
+    readingTimeMs = Math.round(readSeconds * 1000);
+    translationDelayValue.textContent = delaySeconds.toFixed(1) + 's';
+    readingTimeValue.textContent = readSeconds.toFixed(1) + 's';
     captionPosition.value = ['top','center','bottom'].includes(settings.position) ? settings.position : 'bottom';
     captionAlign.value = settings.align === 'right' ? 'right' : 'center';
+    audioCaptureMode.value = ['whisper','input'].includes(settings.audioCaptureMode) ? settings.audioCaptureMode : 'whisper';
+    whisperModel.value = ['onnx-community/whisper-tiny','onnx-community/whisper-base'].includes(settings.whisperModel) ? settings.whisperModel : 'onnx-community/whisper-tiny';
+    whisperDevice.value = ['auto','webgpu','wasm'].includes(settings.whisperDevice) ? settings.whisperDevice : 'auto';
+    whisperChunk.value = Math.min(10, Math.max(2.5, Number(settings.whisperChunk) || 4.5));
+    whisperChunkValue.textContent = Number(whisperChunk.value).toFixed(1) + 's';
     captionOverlay.style.setProperty('--caption-size', size + 'px');
     captionOverlay.style.setProperty('--caption-alpha', (opacity / 100).toFixed(2));
     captionOverlay.style.setProperty('--caption-blur', blur + 'px');
     captionOverlay.classList.toggle('pos-top', captionPosition.value === 'top');
     captionOverlay.classList.toggle('pos-center', captionPosition.value === 'center');
     captionOverlay.classList.toggle('align-right', captionAlign.value === 'right');
+    captionPreviewText.style.fontSize = size + 'px';
+    captionPreviewText.style.background = 'rgba(8,10,16,' + (opacity / 100).toFixed(2) + ')';
+    captionPreviewText.style.backdropFilter = 'blur(' + blur + 'px)';
+    captionPreviewText.style.webkitBackdropFilter = 'blur(' + blur + 'px)';
+    captionPreviewText.style.textAlign = captionAlign.value === 'right' ? 'right' : 'center';
+    captionPreviewText.style.display = '-webkit-box';
+    captionPreviewText.style.webkitBoxOrient = 'vertical';
+    captionPreviewText.style.overflow = captionLineMode.value === 'full' ? 'visible' : 'hidden';
+    captionPreviewText.style.webkitLineClamp = captionLineMode.value === 'full' ? 'unset' : captionLineMode.value;
     applyCaptionLineMode();
     renderInPlayerCaption(inPlayerLines[inPlayerLines.length - 1] || captionCurrent.textContent);
   }
 
   function saveCaptionSettings() {
-    const settings = {size:captionSize.value,opacity:captionOpacity.value,blur:captionBlur.value,lineMode:captionLineMode.value,position:captionPosition.value,align:captionAlign.value};
+    adaptiveTimingEnabled = adaptiveTiming.checked;
+    const settings = {size:captionSize.value,opacity:captionOpacity.value,blur:captionBlur.value,lineMode:captionLineMode.value,translationDelay:translationDelay.value,readingTime:readingTime.value,adaptiveTiming:adaptiveTiming.checked,position:captionPosition.value,align:captionAlign.value,audioCaptureMode:audioCaptureMode.value,whisperModel:whisperModel.value,whisperDevice:whisperDevice.value,whisperChunk:whisperChunk.value};
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     applyCaptionSettings(settings);
   }
@@ -932,8 +1033,8 @@
     playerPane.classList.toggle('active', type === 'youtube' || type === 'local-video');
     const labels = {'system-audio':'SYSTEM AUDIO','youtube':'YOUTUBE','local-video':'LOCAL VIDEO','overlay-only':'OVERLAY'};
     sourceBadge.textContent = labels[type] || 'SOURCE';
-    sourceHelp.textContent = type === 'youtube' ? 'Paste a YouTube link, load it, then press Start Listening. The virtual audio cable still supplies recognition audio.' :
-      type === 'local-video' ? 'Choose a local video. It stays on your device; use the existing selected audio input for recognition.' :
+    sourceHelp.textContent = type === 'youtube' ? 'Paste a YouTube link, load it, then press Start. Choose the YouTube tab and enable Share tab audio; Browser Whisper transcribes it locally.' :
+      type === 'local-video' ? 'Choose a local video. Press Start and share this Spiker tab with Share tab audio enabled so Browser Whisper can transcribe it.' :
       type === 'overlay-only' ? 'Use Open Glass Overlay below and place it above any external player.' :
       'Use your existing virtual audio cable, then press Start Listening below.';
   }
@@ -944,7 +1045,7 @@
     if (!translationDisplayQueue.length) return;
 
     const elapsed = performance.now() - lastTranslationShownAt;
-    const wait = lastTranslationShownAt ? Math.max(0, DISPLAY_GAP_MS - elapsed) : 0;
+    const wait = lastTranslationShownAt ? Math.max(0, readingTimeMs - elapsed) : 0;
     translationDisplayTimer = setTimeout(() => {
       const item = translationDisplayQueue.shift();
       if (!item) return;
@@ -1129,6 +1230,247 @@
     frame();
   }
 
+
+  function feedExternalTranscript(text) {
+    const clean = normalizeSpeechText(text);
+    if (!clean) return;
+    const previousWords = normalizeSpeechText(lastWhisperText).split(' ').filter(Boolean);
+    const currentWords = clean.split(' ').filter(Boolean);
+    let overlap = 0;
+    for (let size = Math.min(previousWords.length, currentWords.length, 18); size >= 1; size--) {
+      if (previousWords.slice(-size).join(' ').toLocaleLowerCase() === currentWords.slice(0, size).join(' ').toLocaleLowerCase()) { overlap = size; break; }
+    }
+    const fresh = currentWords.slice(overlap).join(' ').trim();
+    lastWhisperText = clean;
+    if (!fresh) return;
+    const now = performance.now();
+    lastRecognitionActivityAt = now;
+    lastSegmentSpeechAt = now;
+    if (!segmentStartedAt) segmentStartedAt = now;
+    segmentFinalParts.push(fresh);
+    const liveText = currentSegmentText();
+    if (liveText) appendEnLine(liveText, false);
+    const age = now - segmentStartedAt;
+    if (looksLikeCompletePhrase(liveText, ADAPTIVE_PAUSE_MS, age) || age >= maxSegmentMs()) {
+      flushSegment();
+    }
+  }
+
+  function setWhisperStatus(message, kind = 'normal') {
+    if (!whisperStatus) return;
+    const prefix = kind === 'error' ? '⚠' : kind === 'ready' ? '✓' : '•';
+    whisperStatus.innerHTML = '<b>Whisper:</b> ' + prefix + ' ' + message;
+  }
+
+  function languageForWhisper(locale) {
+    const map = {
+      'en-US':'english','fa-IR':'persian','ar-SA':'arabic','tr-TR':'turkish',
+      'fr-FR':'french','de-DE':'german','es-ES':'spanish','ru-RU':'russian',
+      'zh-CN':'chinese','hi-IN':'hindi'
+    };
+    return map[locale] || null;
+  }
+
+  function createWhisperWorker() {
+    if (whisperWorker) return whisperWorker;
+    const workerSource = `
+      import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+      env.allowLocalModels = false;
+      let transcriber = null;
+      let activeKey = '';
+      async function load(config) {
+        const requested = config.device === 'auto' ? (self.navigator && self.navigator.gpu ? 'webgpu' : 'wasm') : config.device;
+        const key = config.model + '|' + requested;
+        if (transcriber && activeKey === key) return {device: requested};
+        self.postMessage({type:'status', message:'Downloading/loading ' + config.model.split('/').pop() + ' on ' + requested + '…'});
+        try {
+          transcriber = await pipeline('automatic-speech-recognition', config.model, {
+            device: requested,
+            dtype: requested === 'webgpu' ? {encoder_model:'fp16', decoder_model_merged:'q4'} : 'q8'
+          });
+          activeKey = key;
+          return {device: requested};
+        } catch (error) {
+          if (requested === 'webgpu' && config.device === 'auto') {
+            self.postMessage({type:'status', message:'WebGPU unavailable; loading CPU/WASM…'});
+            transcriber = await pipeline('automatic-speech-recognition', config.model, {device:'wasm', dtype:'q8'});
+            activeKey = config.model + '|wasm';
+            return {device:'wasm'};
+          }
+          throw error;
+        }
+      }
+      self.onmessage = async (event) => {
+        const msg = event.data;
+        try {
+          if (msg.type === 'load') {
+            const info = await load(msg.config);
+            self.postMessage({type:'ready', device:info.device});
+          } else if (msg.type === 'transcribe') {
+            const info = await load(msg.config);
+            const audio = new Float32Array(msg.audio);
+            const options = {task:'transcribe', return_timestamps:false};
+            if (msg.language) options.language = msg.language;
+            const result = await transcriber(audio, options);
+            self.postMessage({type:'result', id:msg.id, text:(result && result.text || '').trim(), device:info.device});
+          }
+        } catch (error) {
+          self.postMessage({type:'error', id:msg.id, message:error && error.message ? error.message : String(error)});
+        }
+      };
+    `;
+    const url = URL.createObjectURL(new Blob([workerSource], {type:'text/javascript'}));
+    whisperWorker = new Worker(url, {type:'module'});
+    URL.revokeObjectURL(url);
+    whisperWorker.onmessage = (event) => {
+      const msg = event.data || {};
+      if (msg.type === 'status') setWhisperStatus(msg.message);
+      if (msg.type === 'ready') {
+        whisperReady = true;
+        setWhisperStatus('ready on ' + msg.device + '.', 'ready');
+        processWhisperQueue();
+      }
+      if (msg.type === 'result') {
+        whisperBusy = false;
+        if (msg.text) feedExternalTranscript(msg.text);
+        setWhisperStatus('listening and transcribing on ' + msg.device + '.', 'ready');
+        processWhisperQueue();
+      }
+      if (msg.type === 'error') {
+        whisperBusy = false;
+        setWhisperStatus(msg.message, 'error');
+        showError('Browser Whisper problem: ' + msg.message + '. Try the Tiny model or CPU/WASM mode.');
+        processWhisperQueue();
+      }
+    };
+    whisperWorker.onerror = (event) => {
+      whisperBusy = false;
+      setWhisperStatus(event.message || 'worker failed', 'error');
+    };
+    return whisperWorker;
+  }
+
+  function currentWhisperConfig() {
+    return {model: whisperModel.value, device: whisperDevice.value};
+  }
+
+  function loadWhisperModel() {
+    whisperReady = false;
+    whisperRequestedConfig = currentWhisperConfig();
+    setWhisperStatus('preparing model…');
+    createWhisperWorker().postMessage({type:'load', config:whisperRequestedConfig});
+  }
+
+  function processWhisperQueue() {
+    if (!whisperWorker || !whisperReady || whisperBusy || !whisperQueue.length) return;
+    whisperBusy = true;
+    const item = whisperQueue.shift();
+    whisperWorker.postMessage({
+      type:'transcribe', id:item.id, config:item.config,
+      language:item.language, audio:item.audio.buffer
+    }, [item.audio.buffer]);
+  }
+
+  function queueWhisperAudio(audio) {
+    if (!audio || audio.length < 8000) return;
+    whisperQueue.push({
+      id: Date.now() + '-' + Math.random().toString(16).slice(2),
+      audio,
+      language: languageForWhisper(langSelect.value),
+      config: currentWhisperConfig()
+    });
+    // Keep every chunk in order. Warn instead of silently dropping speech.
+    if (whisperQueue.length > 3) setWhisperStatus('processing behind live audio (' + whisperQueue.length + ' chunks queued). Choose Tiny/WebGPU for lower latency.');
+    processWhisperQueue();
+  }
+
+  function concatFloat32(parts, total) {
+    const out = new Float32Array(total);
+    let offset = 0;
+    for (const part of parts) { out.set(part, offset); offset += part.length; }
+    return out;
+  }
+
+  function resampleTo16k(input, sourceRate) {
+    if (sourceRate === 16000) return new Float32Array(input);
+    const ratio = sourceRate / 16000;
+    const outLength = Math.max(1, Math.round(input.length / ratio));
+    const out = new Float32Array(outLength);
+    for (let i = 0; i < outLength; i++) {
+      const start = Math.floor(i * ratio);
+      const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+      let sum = 0;
+      for (let j = start; j < end; j++) sum += input[j];
+      out[i] = sum / Math.max(1, end - start);
+    }
+    return out;
+  }
+
+  function flushWhisperAudio(force = false) {
+    const targetSamples = Math.round(Number(whisperChunk.value || 4.5) * 16000);
+    if (!force && whisperSampleCount < targetSamples) return;
+    if (!whisperSampleCount) return;
+    const fresh = concatFloat32(whisperSamples, whisperSampleCount);
+    whisperSamples = [];
+    whisperSampleCount = 0;
+    const combined = new Float32Array(whisperOverlapTail.length + fresh.length);
+    combined.set(whisperOverlapTail, 0);
+    combined.set(fresh, whisperOverlapTail.length);
+    const overlapSamples = Math.min(combined.length, Math.round(0.65 * 16000));
+    whisperOverlapTail = combined.slice(combined.length - overlapSamples);
+    queueWhisperAudio(combined);
+  }
+
+  async function startTabAudioCapture() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      throw new Error('Tab audio capture is not supported by this browser.');
+    }
+    loadWhisperModel();
+    captureStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false},
+      preferCurrentTab: true,
+      selfBrowserSurface: 'include',
+      surfaceSwitching: 'include',
+      systemAudio: 'include'
+    });
+    const audioTracks = captureStream.getAudioTracks();
+    if (!audioTracks.length) {
+      captureStream.getTracks().forEach(t => t.stop());
+      captureStream = null;
+      throw new Error('No shared audio was received. Select the YouTube tab and enable “Share tab audio”.');
+    }
+    captureStream.getVideoTracks().forEach(t => { t.enabled = false; });
+    const audioOnly = new MediaStream(audioTracks);
+    whisperAudioContext = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+    await whisperAudioContext.resume();
+    whisperAudioSource = whisperAudioContext.createMediaStreamSource(audioOnly);
+    // ScriptProcessor remains broadly compatible for a static no-build app.
+    whisperProcessor = whisperAudioContext.createScriptProcessor(4096, 1, 1);
+    whisperSilentGain = whisperAudioContext.createGain();
+    whisperSilentGain.gain.value = 0;
+    whisperProcessor.onaudioprocess = (event) => {
+      if (!listening || activeAudioMode !== 'tab') return;
+      const mono = event.inputBuffer.getChannelData(0);
+      const pcm16k = resampleTo16k(mono, whisperAudioContext.sampleRate);
+      whisperSamples.push(pcm16k);
+      whisperSampleCount += pcm16k.length;
+      flushWhisperAudio(false);
+    };
+    whisperAudioSource.connect(whisperProcessor);
+    whisperProcessor.connect(whisperSilentGain);
+    whisperSilentGain.connect(whisperAudioContext.destination);
+    const ended = () => { if (listening && activeAudioMode === 'tab') stopListening(); };
+    captureStream.getTracks().forEach(t => t.addEventListener('ended', ended, {once:true}));
+    activeAudioMode = 'tab';
+    recognitionStarted = true;
+    starting = false;
+    setStatus(true);
+    statusText.textContent = 'WHISPER';
+    startSegmentTimer();
+    setupPanel.removeAttribute('open');
+  }
+
   async function startListening() {
     if (starting || listening) return;
     clearError();
@@ -1137,10 +1479,15 @@
     toggleBtn.disabled = true;
     statusText.textContent = 'STARTING…';
 
+    const requestedMode = audioCaptureMode.value;
     try {
-      // Do not call getUserMedia here. SpeechRecognition already opens the
-      // selected input device itself, so requesting a second microphone stream
-      // only creates an unnecessary extra permission path.
+      if (requestedMode === 'whisper') {
+        await startTabAudioCapture();
+        saveCaptionSettings();
+        return;
+      }
+
+      activeAudioMode = 'input';
       recognition = initRecognition();
       if (!recognition) {
         starting = false;
@@ -1148,12 +1495,11 @@
       }
       recognition.lang = langSelect.value;
       recognition.start();
-      // setStatus(true) is intentionally called only from rec.onstart.
     } catch (err) {
       starting = false;
       recognitionStarted = false;
       setStatus(false);
-      showError('Could not start speech recognition: ' + err.message + '. Chrome still requires one-time input permission because its built-in speech recognizer reads the selected virtual audio cable as an input device.');
+      showError('Could not start audio transcription: ' + err.message);
     } finally {
       toggleBtn.disabled = false;
     }
@@ -1169,6 +1515,18 @@
     clearInterval(recognitionWatchdog);
     recognitionWatchdog = null;
     if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+    flushWhisperAudio(true);
+    if (whisperProcessor) { try { whisperProcessor.disconnect(); } catch(e){} whisperProcessor.onaudioprocess = null; }
+    if (whisperAudioSource) { try { whisperAudioSource.disconnect(); } catch(e){} }
+    if (whisperSilentGain) { try { whisperSilentGain.disconnect(); } catch(e){} }
+    if (whisperAudioContext) { try { whisperAudioContext.close(); } catch(e){} }
+    whisperProcessor = null; whisperAudioSource = null; whisperSilentGain = null; whisperAudioContext = null;
+    whisperSamples = []; whisperSampleCount = 0; whisperOverlapTail = new Float32Array(0);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') { try { mediaRecorder.stop(); } catch(e){} }
+    mediaRecorder = null;
+    if (captureStream) captureStream.getTracks().forEach(t => t.stop());
+    captureStream = null;
+    activeAudioMode = 'input';
     if (rafId) cancelAnimationFrame(rafId);
     if (micStream) micStream.getTracks().forEach(t => t.stop());
     micStream = null;
@@ -1294,9 +1652,14 @@
     localVideo.style.display = 'block'; youtubeFrame.style.display = 'none'; youtubeFrame.src = ''; videoEmpty.style.display = 'none';
     localFileName.textContent = file.name;
   });
-  [captionSize,captionOpacity,captionBlur,captionLineMode,captionPosition,captionAlign].forEach(el => el.addEventListener('input', saveCaptionSettings));
-  resetCaptionSettings.addEventListener('click', () => { localStorage.removeItem(SETTINGS_KEY); applyCaptionSettings({}); });
-  try { applyCaptionSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (_) { applyCaptionSettings({}); }
+  [captionSize,captionOpacity,captionBlur,captionLineMode,translationDelay,readingTime,adaptiveTiming,captionPosition,captionAlign,audioCaptureMode,whisperModel,whisperDevice,whisperChunk].forEach(el => el.addEventListener('input', saveCaptionSettings));
+  whisperChunk.addEventListener('input', () => whisperChunkValue.textContent = Number(whisperChunk.value).toFixed(1) + 's');
+  [whisperModel, whisperDevice].forEach(el => el.addEventListener('change', () => { whisperReady = false; whisperQueue = []; if (whisperWorker) { whisperWorker.terminate(); whisperWorker = null; } setWhisperStatus('model setting changed; it will load on next Start.'); }));
+  resetCaptionSettings.addEventListener('click', () => { localStorage.removeItem(SETTINGS_KEY); localStorage.removeItem(LEGACY_SETTINGS_KEY); applyCaptionSettings({}); saveCaptionSettings(); });
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(LEGACY_SETTINGS_KEY) || '{}';
+    applyCaptionSettings(JSON.parse(raw));
+  } catch (_) { applyCaptionSettings({}); }
   selectSource(sourceSelect.value);
 
   window.addEventListener('beforeunload', () => {
