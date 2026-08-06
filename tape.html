@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tape — audio & video to transcript</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1621;
+    --ink-2:#152130;
+    --ink-3:#1D2C3E;
+    --rule:#2B3B4E;
+    --dim:#7E93A8;
+    --fg:#DCE6F0;
+    --amber:#F2B441;
+    --teal:#5EC8C0;
+    --red:#E4695B;
+    --paper:#F6F1E4;
+    --paper-2:#EDE6D5;
+    --paper-ink:#1C1A15;
+    --paper-dim:#6E675A;
+    --sans:"Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --serif:"Newsreader", Georgia, "Times New Roman", serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--ink);
+    color:var(--fg);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 500px at 80% -10%, rgba(242,180,65,.07), transparent 60%),
+      radial-gradient(700px 400px at 0% 0%, rgba(94,200,192,.06), transparent 60%);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:34px 20px 80px}
+
+  /* ---------- masthead ---------- */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:26px}
+  h1{
+    font-size:clamp(30px,6vw,46px);font-weight:700;letter-spacing:-.03em;margin:0;line-height:.95;
+  }
+  h1 .mark{color:var(--amber)}
+  .tagline{color:var(--dim);font-size:14px;margin:10px 0 0;max-width:44ch;line-height:1.5}
+  .badge{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--teal);border:1px solid var(--rule);border-radius:999px;padding:6px 11px;white-space:nowrap;
+  }
+
+  /* ---------- console ---------- */
+  .console{
+    background:linear-gradient(180deg,var(--ink-2),#121C29);
+    border:1px solid var(--rule);border-radius:14px;overflow:hidden;
+    box-shadow:0 20px 50px -30px #000;
+  }
+  .drop{
+    padding:30px 24px;text-align:center;cursor:pointer;
+    border-bottom:1px solid var(--rule);
+    transition:background .18s ease;
+    display:block;width:100%;background:transparent;color:inherit;font:inherit;border-left:0;border-right:0;border-top:0;
+  }
+  .drop:hover,.drop:focus-visible{background:var(--ink-3)}
+  .drop.hot{background:var(--ink-3);box-shadow:inset 0 0 0 2px var(--amber)}
+  .drop:focus-visible{outline:2px solid var(--amber);outline-offset:-4px}
+  .drop-title{font-size:17px;font-weight:500}
+  .drop-sub{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:8px;letter-spacing:.04em}
+  .reel{display:flex;gap:14px;justify-content:center;margin-bottom:16px}
+  .reel span{
+    width:26px;height:26px;border-radius:50%;border:2px solid var(--rule);
+    display:block;position:relative;
+  }
+  .reel span::after{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--rule)}
+  body.busy .reel span{animation:spin 1.6s linear infinite;border-color:var(--amber)}
+  body.busy .reel span::after{background:var(--amber)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- loaded file row ---------- */
+  .loaded{display:none;padding:16px 20px;border-bottom:1px solid var(--rule);align-items:center;gap:14px;flex-wrap:wrap}
+  .loaded.on{display:flex}
+  .fname{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(100%,420px)}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.04em}
+  .swap{margin-left:auto;background:none;border:1px solid var(--rule);color:var(--dim);font-family:var(--mono);
+    font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:7px 12px;border-radius:7px;cursor:pointer}
+  .swap:hover{color:var(--fg);border-color:var(--dim)}
+
+  /* ---------- signature: waveform / progress / scrubber ---------- */
+  .strip{display:none;position:relative;border-bottom:1px solid var(--rule);background:#0C1420}
+  .strip.on{display:block}
+  canvas{display:block;width:100%;height:104px;cursor:pointer}
+  .ticks{
+    position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;
+    padding:0 8px 5px;font-family:var(--mono);font-size:9.5px;color:var(--dim);pointer-events:none;letter-spacing:.06em
+  }
+  .playhead{position:absolute;top:0;bottom:0;width:1px;background:var(--amber);left:0;pointer-events:none;opacity:0}
+  .playhead.on{opacity:1}
+
+  /* ---------- settings ---------- */
+  .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--rule)}
+  .field{background:var(--ink-2);padding:14px 16px}
+  label.lbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+  select{
+    width:100%;background:var(--ink);color:var(--fg);border:1px solid var(--rule);border-radius:7px;
+    padding:9px 10px;font-family:var(--sans);font-size:13.5px;cursor:pointer;
+  }
+  select:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  .hint{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:7px;line-height:1.4}
+
+  /* ---------- action bar ---------- */
+  .actions{display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--ink-2);flex-wrap:wrap;border-top:1px solid var(--rule)}
+  .go{
+    background:var(--amber);color:#231A05;border:0;border-radius:9px;padding:13px 24px;
+    font-family:var(--sans);font-weight:700;font-size:14.5px;letter-spacing:.01em;cursor:pointer;
+  }
+  .go:hover{filter:brightness(1.08)}
+  .go:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .go:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .stop{background:none;border:1px solid var(--red);color:var(--red);border-radius:9px;padding:12px 18px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;display:none}
+  .stop.on{display:inline-block}
+  .readout{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.03em;flex:1;min-width:180px}
+  .readout b{color:var(--teal);font-weight:500}
+  .readout.err{color:var(--red)}
+  .bar{height:3px;background:var(--rule);border-radius:2px;overflow:hidden;margin-top:7px}
+  .bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .25s ease}
+
+  /* ---------- the page ---------- */
+  .sheet{display:none;margin-top:30px;background:var(--paper);color:var(--paper-ink);border-radius:14px;overflow:hidden;
+    box-shadow:0 26px 60px -34px #000}
+  .sheet.on{display:block}
+  .sheet-top{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--paper-2);flex-wrap:wrap}
+  .tab{
+    background:none;border:0;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--paper-dim);padding:7px 2px;margin-right:16px;cursor:pointer;border-bottom:2px solid transparent
+  }
+  .tab.sel{color:var(--paper-ink);border-bottom-color:var(--amber)}
+  .save{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .save button{
+    background:transparent;border:1px solid #D3C9B2;color:var(--paper-ink);border-radius:7px;padding:7px 12px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer
+  }
+  .save button:hover{background:var(--paper-2)}
+  .body{padding:30px 34px 40px}
+  #plain{font-family:var(--serif);font-size:18px;line-height:1.72;white-space:pre-wrap;margin:0}
+  #plain p{margin:0 0 1.1em}
+  .seg{display:grid;grid-template-columns:76px 1fr;gap:16px;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;text-align:left;background:none;border-left:0;border-right:0;border-top:0;width:100%}
+  .seg:hover{background:var(--paper-2)}
+  .seg time{font-family:var(--mono);font-size:11.5px;color:var(--paper-dim);padding-top:5px}
+  .seg span{font-family:var(--serif);font-size:16.5px;line-height:1.6}
+  .seg.live{background:#F7E8C4}
+  .seg.live time{color:#8A6A16}
+  audio,video{display:none;width:100%;margin-top:14px;border-radius:8px}
+  audio.on,video.on{display:block}
+
+  /* ---------- footnotes ---------- */
+  details{margin-top:26px;border-top:1px solid var(--rule);padding-top:16px}
+  summary{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);cursor:pointer}
+  details p,details li{color:var(--dim);font-size:13.5px;line-height:1.65}
+  details code{font-family:var(--mono);font-size:12.5px;color:var(--amber);background:var(--ink-2);padding:2px 6px;border-radius:4px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:560px){.body{padding:22px 20px 30px}.seg{grid-template-columns:64px 1fr;gap:10px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Tape<span class="mark">.</span></h1>
+      <p class="tagline">Drop in a recording — a lecture, an interview, a video — and get the words back as a text file. Nothing leaves this browser.</p>
+    </div>
+    <div class="badge" id="engineBadge">checking hardware</div>
+  </header>
+
+  <div class="console">
+    <button class="drop" id="drop" type="button">
+      <div class="reel"><span></span><span></span></div>
+      <div class="drop-title">Drop a file here, or click to choose one</div>
+      <div class="drop-sub">MP3 · WAV · M4A · OGG · FLAC · MP4 · MOV · WEBM</div>
+    </button>
+    <input type="file" id="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.ogg,.flac,.mp4,.mov,.webm,.mkv" hidden>
+
+    <div class="loaded" id="loaded">
+      <div>
+        <div class="fname" id="fname"></div>
+        <div class="meta" id="fmeta"></div>
+      </div>
+      <button class="swap" id="swap" type="button">Change file</button>
+    </div>
+
+    <div class="strip" id="strip">
+      <canvas id="wave"></canvas>
+      <div class="playhead" id="playhead"></div>
+      <div class="ticks"><span id="t0">0:00</span><span id="t1"></span></div>
+    </div>
+
+    <div class="settings">
+      <div class="field">
+        <label class="lbl" for="model">Accuracy</label>
+        <select id="model">
+          <option value="tiny">Draft — fastest, roughest</option>
+          <option value="base" selected>Standard — good balance</option>
+          <option value="small">Careful — slowest, most accurate</option>
+        </select>
+        <div class="hint" id="modelHint">~150 MB downloaded once, then cached</div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="lang">Spoken language</label>
+        <select id="lang">
+          <option value="">Detect automatically</option>
+          <option value="english">English</option>
+          <option value="ukrainian">Ukrainian</option>
+          <option value="russian">Russian</option>
+          <option value="polish">Polish</option>
+          <option value="german">German</option>
+          <option value="french">French</option>
+          <option value="spanish">Spanish</option>
+          <option value="portuguese">Portuguese</option>
+          <option value="italian">Italian</option>
+          <option value="dutch">Dutch</option>
+          <option value="czech">Czech</option>
+          <option value="romanian">Romanian</option>
+          <option value="turkish">Turkish</option>
+          <option value="arabic">Arabic</option>
+          <option value="hebrew">Hebrew</option>
+          <option value="hindi">Hindi</option>
+          <option value="chinese">Chinese</option>
+          <option value="japanese">Japanese</option>
+          <option value="korean">Korean</option>
+          <option value="vietnamese">Vietnamese</option>
+          <option value="indonesian">Indonesian</option>
+          <option value="swedish">Swedish</option>
+          <option value="greek">Greek</option>
+        </select>
+        <div class="hint">Naming the language beats auto-detect on noisy audio</div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="task">Output</label>
+        <select id="task">
+          <option value="transcribe">Same language as the audio</option>
+          <option value="translate">Translated to English</option>
+        </select>
+        <div class="hint">Translation runs at the same speed</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="go" id="go" disabled>Transcribe</button>
+      <button class="stop" id="stop" type="button">Cancel</button>
+      <div class="readout" id="readout">
+        <span id="msg">Waiting for a file.</span>
+        <div class="bar"><i id="fill"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="sheet" id="sheet" aria-live="polite">
+    <div class="sheet-top">
+      <button class="tab sel" id="tabText" type="button">Transcript</button>
+      <button class="tab" id="tabTime" type="button">With timecodes</button>
+      <div class="save">
+        <button id="copy" type="button">Copy</button>
+        <button id="dlTxt" type="button">.txt</button>
+        <button id="dlSrt" type="button">.srt</button>
+        <button id="dlVtt" type="button">.vtt</button>
+      </div>
+    </div>
+    <div class="body">
+      <div id="plain"></div>
+      <div id="timed" hidden></div>
+      <audio id="aud" controls preload="metadata"></audio>
+      <video id="vid" controls preload="metadata"></video>
+    </div>
+  </section>
+
+  <details>
+    <summary>If something goes wrong</summary>
+    <p><b>“Could not load the speech model.”</b> The model is fetched from a CDN the first time you run it, so you need to be online for that first run. If you saved this page to your disk, open it through a small local server rather than double-clicking it — browsers block module loading on <code>file://</code>. From the folder containing this file run <code>python3 -m http.server 8000</code> and visit <code>http://localhost:8000/transcriber.html</code>.</p>
+    <p><b>“Could not read the audio.”</b> The browser decodes the file itself, so exotic codecs (some MKV and MOV variants) can fail. Convert first: <code>ffmpeg -i input.mov -ac 1 -ar 16000 output.wav</code>.</p>
+    <p><b>It is slow.</b> WebGPU (Chrome and Edge) is many times faster than the CPU fallback. On CPU, expect roughly real-time on Standard — an hour of audio takes about an hour. Drop to Draft for long files, or split them up.</p>
+    <p><b>Accuracy.</b> This runs the Whisper family of models. Clean single-speaker audio comes out very well; heavy crosstalk, music, and thick accents do not. It does not label who is speaking.</p>
+  </details>
+</div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const MODELS = {
+  tiny:  { wasm:'Xenova/whisper-tiny',  gpu:'onnx-community/whisper-tiny',  size:'~75 MB'  },
+  base:  { wasm:'Xenova/whisper-base',  gpu:'onnx-community/whisper-base',  size:'~150 MB' },
+  small: { wasm:'Xenova/whisper-small', gpu:'onnx-community/whisper-small', size:'~500 MB' },
+};
+const hasGPU = !!navigator.gpu;
+$('engineBadge').textContent = hasGPU ? 'WebGPU · fast path' : 'CPU · slower path';
+$('engineBadge').style.color = hasGPU ? 'var(--teal)' : 'var(--amber)';
+$('model').addEventListener('change', () => {
+  $('modelHint').textContent = MODELS[$('model').value].size + ' downloaded once, then cached';
+});
+
+/* ---------------- worker (kept inline so this stays one file) ---------------- */
+const WORKER = [
+"let lib=null, LIBV=0, pipe=null, key='';",
+"async function load(){",
+"  if(lib) return lib;",
+"  try{ lib = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/dist/transformers.min.js'); LIBV=3; }",
+"  catch(e){ lib = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js'); LIBV=2; }",
+"  lib.env.allowLocalModels=false;",
+"  return lib;",
+"}",
+"async function build(model, gpu, report){",
+"  const t = await load();",
+"  const opts = { progress_callback: report };",
+"  if(LIBV===3){",
+"    opts.device = gpu ? 'webgpu' : 'wasm';",
+"    opts.dtype = gpu ? { encoder_model:'fp16', decoder_model_merged:'q4' }",
+"                     : { encoder_model:'fp32', decoder_model_merged:'q8' };",
+"  } else { opts.quantized = true; }",
+"  return await t.pipeline('automatic-speech-recognition', model, opts);",
+"}",
+"self.onmessage = async (ev) => {",
+"  const d = ev.data;",
+"  if(d.type !== 'run') return;",
+"  const report = p => self.postMessage({type:'progress', p:p});",
+"  const attempts = [];",
+"  if(d.gpu) attempts.push({model:d.gpuModel, gpu:true});",
+"  attempts.push({model:d.wasmModel, gpu:false});",
+"  let lastErr = null;",
+"  for(let i=0;i<attempts.length;i++){",
+"    const a = attempts[i];",
+"    try{",
+"      const k = a.model+'|'+a.gpu;",
+"      if(k!==key || !pipe){ self.postMessage({type:'stage', s:'load', gpu:a.gpu}); pipe = await build(a.model, a.gpu, report); key=k; }",
+"      self.postMessage({type:'stage', s:'run', gpu:a.gpu});",
+"      const args = {",
+"        chunk_length_s: 30,",
+"        stride_length_s: 5,",
+"        return_timestamps: true,",
+"        force_full_sequences: false,",
+"        chunk_callback: () => self.postMessage({type:'tick'}),",
+"      };",
+"      if(d.lang){ args.language = d.lang; }",
+"      if(d.task){ args.task = d.task; }",
+"      const out = await pipe(d.audio, args);",
+"      self.postMessage({type:'done', out:out});",
+"      return;",
+"    }catch(err){ lastErr = err; pipe = null; key = ''; }",
+"  }",
+"  self.postMessage({type:'error', message: String((lastErr && lastErr.message) || lastErr)});",
+"};"
+].join("\n");
+
+let worker = null;
+function spawn(){
+  const url = URL.createObjectURL(new Blob([WORKER], {type:'text/javascript'}));
+  const w = new Worker(url, {type:'module'});
+  w.onmessage = onWorker;
+  w.onerror = () => fail('Could not load the speech model. Check the notes below this panel.');
+  return w;
+}
+
+/* ---------------- state ---------------- */
+let pcm = null, duration = 0, file = null, mediaURL = null, result = null, peaks = null, busy = false, ticks = 0, expected = 1;
+
+/* ---------------- file intake ---------------- */
+const drop = $('drop'), input = $('file');
+drop.addEventListener('click', () => input.click());
+$('swap').addEventListener('click', () => input.click());
+input.addEventListener('change', e => { if(e.target.files[0]) accept(e.target.files[0]); });
+['dragenter','dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave','drop'].forEach(t => document.addEventListener(t, e => {
+  e.preventDefault();
+  if(t==='dragleave' && e.relatedTarget) return;
+  drop.classList.remove('hot');
+  if(t==='drop' && e.dataTransfer.files[0]) accept(e.dataTransfer.files[0]);
+}));
+
+async function accept(f){
+  if(busy) return;
+  file = f;
+  $('sheet').classList.remove('on');
+  $('go').disabled = true;
+  say('Reading the file…');
+  $('fname').textContent = f.name;
+  $('fmeta').textContent = (f.size/1048576).toFixed(1) + ' MB';
+  $('loaded').classList.add('on');
+  try{
+    const buf = await f.arrayBuffer();
+    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new OC(1, 16000, 16000);
+    const decoded = await ctx.decodeAudioData(buf);
+    duration = decoded.duration;
+    if(decoded.numberOfChannels > 1){
+      const a = decoded.getChannelData(0), b = decoded.getChannelData(1);
+      pcm = new Float32Array(a.length);
+      for(let i=0;i<a.length;i++) pcm[i] = (a[i]+b[i])/2;
+    } else {
+      pcm = new Float32Array(decoded.getChannelData(0));
+    }
+  }catch(err){
+    return fail('Could not read the audio in this file. Convert it to WAV or MP3 and try again.');
+  }
+  $('fmeta').textContent = (f.size/1048576).toFixed(1) + ' MB · ' + clock(duration) + ' long';
+  $('t1').textContent = clock(duration);
+  if(mediaURL) URL.revokeObjectURL(mediaURL);
+  mediaURL = URL.createObjectURL(f);
+  const isVid = /^video\//.test(f.type) || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name);
+  const player = isVid ? $('vid') : $('aud');
+  $('vid').classList.toggle('on', isVid); $('aud').classList.toggle('on', !isVid);
+  $('vid').src = isVid ? mediaURL : ''; $('aud').src = isVid ? '' : mediaURL;
+  player.ontimeupdate = () => { movePlayhead(player.currentTime); highlight(player.currentTime); };
+  $('strip').classList.add('on');
+  buildPeaks(); drawWave(0);
+  $('go').disabled = false;
+  say('Ready. ' + clock(duration) + ' of audio.');
+}
+
+/* ---------------- waveform ---------------- */
+const cv = $('wave'), g = cv.getContext('2d');
+function buildPeaks(){
+  const N = 900; peaks = new Float32Array(N);
+  const step = Math.max(1, Math.floor(pcm.length / N));
+  for(let i=0;i<N;i++){
+    let m = 0; const s = i*step, e = Math.min(pcm.length, s+step);
+    for(let j=s;j<e;j+=3){ const v = Math.abs(pcm[j]); if(v>m) m=v; }
+    peaks[i] = m;
+  }
+  const max = Math.max(...peaks) || 1;
+  for(let i=0;i<N;i++) peaks[i] = Math.min(1, peaks[i]/max);
+}
+function drawWave(done){
+  if(!peaks) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = 104;
+  cv.width = w*dpr; cv.height = h*dpr; cv.style.height = h+'px';
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+  const mid = h/2 - 5, bw = 2, gap = 1, n = Math.floor(w/(bw+gap));
+  for(let i=0;i<n;i++){
+    const p = peaks[Math.floor(i/n*peaks.length)] || 0;
+    const bh = Math.max(1.5, p*(h-30));
+    g.fillStyle = (i/n) < done ? '#F2B441' : '#2B3B4E';
+    g.fillRect(i*(bw+gap), mid-bh/2, bw, bh);
+  }
+}
+window.addEventListener('resize', () => drawWave(lastDone));
+let lastDone = 0;
+function progressWave(f){ lastDone = f; drawWave(f); }
+cv.addEventListener('click', e => {
+  if(!duration) return;
+  const r = cv.getBoundingClientRect();
+  seek((e.clientX - r.left)/r.width * duration);
+});
+function movePlayhead(t){
+  const ph = $('playhead');
+  ph.classList.add('on');
+  ph.style.left = (t/duration*100) + '%';
+}
+
+/* ---------------- run ---------------- */
+$('go').addEventListener('click', start);
+$('stop').addEventListener('click', () => {
+  if(worker){ worker.terminate(); worker = null; }
+  finish(false); say('Cancelled.');
+});
+
+function start(){
+  if(!pcm || busy) return;
+  busy = true; ticks = 0;
+  expected = Math.max(1, Math.ceil(duration/20));
+  document.body.classList.add('busy');
+  $('go').disabled = true; $('stop').classList.add('on');
+  $('readout').classList.remove('err');
+  $('sheet').classList.remove('on');
+  progressWave(0);
+  say('Warming up the model…'); setFill(0.02);
+  const m = MODELS[$('model').value];
+  worker = worker || spawn();
+  const audio = pcm.slice();
+  worker.postMessage({
+    type:'run', audio,
+    wasmModel:m.wasm, gpuModel:m.gpu, gpu:hasGPU,
+    lang: $('lang').value || null,
+    task: $('task').value,
+  }, [audio.buffer]);
+}
+
+const files = new Map();
+function onWorker(e){
+  const d = e.data;
+  if(d.type === 'progress'){
+    const p = d.p;
+    if(p.status === 'progress' && p.file && /\.(onnx|onnx_data|bin)$/.test(p.file)){
+      files.set(p.file, {loaded:p.loaded||0, total:p.total||0});
+      let l=0,t=0; files.forEach(v => { l+=v.loaded; t+=v.total; });
+      if(t){ setFill(Math.min(.99, l/t)); say('Downloading the model — ' + Math.round(l/t*100) + '% of ' + (t/1048576).toFixed(0) + ' MB (cached after this)'); }
+    }
+  } else if(d.type === 'stage'){
+    if(d.s === 'run'){ files.clear(); setFill(0); say('Listening' + (d.gpu ? ' on the GPU' : ' on the CPU') + '… <b>0%</b>'); }
+    else if(d.s === 'load' && !d.gpu){ say('Loading the model…'); }
+  } else if(d.type === 'tick'){
+    ticks++;
+    const f = Math.min(.99, ticks/expected);
+    setFill(f); progressWave(f);
+    say('Listening… <b>' + Math.round(f*100) + '%</b> · ' + clock(Math.min(duration, ticks*20)) + ' of ' + clock(duration));
+  } else if(d.type === 'done'){
+    result = normalize(d.out);
+    render();
+    setFill(1); progressWave(1);
+    say('Done — ' + result.words + ' words.');
+    finish(true);
+  } else if(d.type === 'error'){
+    fail('Transcription failed: ' + d.message);
+  }
+}
+function finish(ok){
+  busy = false;
+  document.body.classList.remove('busy');
+  $('go').disabled = false; $('stop').classList.remove('on');
+  if(!ok) setFill(0);
+}
+function fail(msg){
+  say(msg); $('readout').classList.add('err'); finish(false); setFill(0);
+}
+function say(html){ $('msg').innerHTML = html; }
+function setFill(f){ $('fill').style.width = (f*100) + '%'; }
+
+/* ---------------- results ---------------- */
+function normalize(out){
+  const raw = Array.isArray(out) ? out[0] : out;
+  const chunks = (raw.chunks || []).map(c => ({
+    start: c.timestamp && c.timestamp[0] != null ? c.timestamp[0] : 0,
+    end:   c.timestamp && c.timestamp[1] != null ? c.timestamp[1] : null,
+    text:  (c.text || '').trim(),
+  })).filter(c => c.text);
+  for(let i=0;i<chunks.length;i++){
+    if(chunks[i].end == null) chunks[i].end = i+1 < chunks.length ? chunks[i+1].start : duration;
+  }
+  const text = (raw.text || chunks.map(c => c.text).join(' ')).trim();
+  return { text, chunks, words: text.split(/\s+/).filter(Boolean).length };
+}
+function paragraphs(text){
+  const sents = text.match(/[^.!?…]+[.!?…]*\s*/g) || [text];
+  const out = []; let buf = [];
+  sents.forEach((s,i) => { buf.push(s.trim()); if(buf.length >= 4 || i === sents.length-1){ out.push(buf.join(' ')); buf = []; } });
+  return out.filter(Boolean);
+}
+function render(){
+  const plain = $('plain'); plain.innerHTML = '';
+  paragraphs(result.text).forEach(p => {
+    const el = document.createElement('p'); el.textContent = p; plain.append(el);
+  });
+  const t = $('timed'); t.innerHTML = '';
+  result.chunks.forEach((c,i) => {
+    const b = document.createElement('button');
+    b.className = 'seg'; b.type = 'button'; b.dataset.i = i;
+    const tm = document.createElement('time'); tm.textContent = clock(c.start);
+    const sp = document.createElement('span'); sp.textContent = c.text;
+    b.append(tm, sp);
+    b.addEventListener('click', () => seek(c.start));
+    t.append(b);
+  });
+  $('sheet').classList.add('on');
+  $('sheet').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function highlight(t){
+  if(!result) return;
+  const nodes = $('timed').children;
+  for(let i=0;i<nodes.length;i++){
+    const c = result.chunks[i];
+    nodes[i].classList.toggle('live', t >= c.start && t < c.end);
+  }
+}
+function seek(t){
+  const p = $('vid').classList.contains('on') ? $('vid') : $('aud');
+  p.currentTime = t; p.play().catch(()=>{});
+  movePlayhead(t);
+}
+
+$('tabText').addEventListener('click', () => swapTab(true));
+$('tabTime').addEventListener('click', () => swapTab(false));
+function swapTab(plain){
+  $('plain').hidden = !plain; $('timed').hidden = plain;
+  $('tabText').classList.toggle('sel', plain); $('tabTime').classList.toggle('sel', !plain);
+}
+
+/* ---------------- export ---------------- */
+function clock(s){
+  s = Math.max(0, s||0);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = Math.floor(s%60);
+  return (h ? h + ':' + String(m).padStart(2,'0') : m) + ':' + String(sec).padStart(2,'0');
+}
+function stamp(s, comma){
+  s = Math.max(0, s||0);
+  const h = String(Math.floor(s/3600)).padStart(2,'0');
+  const m = String(Math.floor(s%3600/60)).padStart(2,'0');
+  const sec = String(Math.floor(s%60)).padStart(2,'0');
+  const ms = String(Math.round((s%1)*1000)).padStart(3,'0');
+  return h+':'+m+':'+sec+(comma?',':'.')+ms;
+}
+function toSrt(){
+  return result.chunks.map((c,i) =>
+    (i+1) + '\n' + stamp(c.start,true) + ' --> ' + stamp(c.end,true) + '\n' + c.text + '\n').join('\n');
+}
+function toVtt(){
+  return 'WEBVTT\n\n' + result.chunks.map(c =>
+    stamp(c.start,false) + ' --> ' + stamp(c.end,false) + '\n' + c.text + '\n').join('\n');
+}
+function save(text, ext){
+  const base = (file ? file.name.replace(/\.[^.]+$/, '') : 'transcript');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:'text/plain;charset=utf-8'}));
+  a.download = base + '.' + ext;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$('dlTxt').addEventListener('click', () => result && save(paragraphs(result.text).join('\n\n'), 'txt'));
+$('dlSrt').addEventListener('click', () => result && save(toSrt(), 'srt'));
+$('dlVtt').addEventListener('click', () => result && save(toVtt(), 'vtt'));
+$('copy').addEventListener('click', async () => {
+  if(!result) return;
+  await navigator.clipboard.writeText(result.text);
+  const b = $('copy'); b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1400);
+});
+</script>
+</body>
+</html>
